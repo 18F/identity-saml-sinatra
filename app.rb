@@ -25,7 +25,7 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/success/?' do
-    '<b>Success!</b>'
+    erb :success
   end
 
   run! if app_file == $0

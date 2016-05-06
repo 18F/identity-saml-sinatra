@@ -1,7 +1,21 @@
-<h2>Hello! Please log in.</h2>
-
-<form action="/login" method="POST">
-  <label for="dummy_field">Placeholder field</label>
-  <input class="field" name="dummy_field" id="dummy_field" type="text">
-  <input class="btn btn-primary" type="submit" value="Submit">
-</form>
+<div class="py1 mb3 center">
+  <h2>Please log in to continue.</h2>
+  <form action="/login" method="POST">
+    <button type="submit" class="btn btn-primary h3">login.gov →</button>
+  </form>
+</div>
+<div class="clearfix py3 mxn1">
+  <% (0..7).each do |i| %>
+    <div class="sm-col sm-col-6 px1">
+      <div class="p2 mb2 bg-white rounded">
+        <div class="p1 mb1 bg-darken-1 col-7"></div>
+        <div class="p1 mb1 bg-darken-1 col-10"></div>
+        <div class="p1 mb1 bg-darken-1 col-5"></div>
+        <div class="p1 mb1 bg-darken-1 col-8"></div>
+        <div class="p1 mb1 bg-darken-1 col-6"></div>
+        <div class="p1 mb1 bg-darken-1 col-11"></div>
+        <div class="p1 mb1 bg-darken-1 col-8"></div>
+      </div>
+    </div>
+  <% end %>
+</div>
