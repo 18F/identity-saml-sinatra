@@ -31,6 +31,7 @@ class RelyingParty < Sinatra::Base
       puts 'Login received'
       request = OneLogin::RubySaml::Authrequest.new
       puts "Request: #{request}"
+      x = saml_settings
       redirect to(request.create(saml_settings))
     # rescue
     #   Fake a success for now
@@ -64,7 +65,10 @@ class RelyingParty < Sinatra::Base
   private
 
   def saml_settings
-    OpenStruct.new(YAML.load_file 'config/saml_settings.yml')
+    settings = OpenStruct.new(YAML.load_file 'config/saml_settings.yml')
+    settings[:certificate] = File.read('config/server.crt')
+    settings[:private_key] = File.read('config/server.key')
+    settings
   end
 
   run! if app_file == $0

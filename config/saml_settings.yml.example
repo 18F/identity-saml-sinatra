@@ -1,8 +1,8 @@
 ---
-assertion_consumer_service_url: http://localhost:4567/consume
+assertion_consumer_service_url: https://identity-rp-dev.apps.cloud.gov/consume
 assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
 issuer: USA-RUBY-SP
-idp_sso_target_url: http://localhost:3000/api/saml/auth
+idp_sso_target_url: https://upaya-dev.18f.gov/api/saml/auth
 idp_cert_fingerprint: F9:A3:9B:2F:8F:1C:E2:79:27:69:EB:32:ED:2A:D5:A2:A7:58:5F:C0:74:8A:4A:03:D9:0F:77:A5:89:7F:F9:68
 name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
 security:
