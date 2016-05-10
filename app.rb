@@ -2,11 +2,12 @@ require 'erb'
 require 'net/http'
 require 'sinatra/base'
 require 'onelogin/ruby-saml'
-require 'ostruct'
 require 'yaml'
 # require_relative 'app/saml_settings'
 
 class RelyingParty < Sinatra::Base
+  enable :sessions
+
   def init(uri)
     @auth_server_uri = uri
   end
@@ -48,27 +49,29 @@ class RelyingParty < Sinatra::Base
     response = OneLogin::RubySaml::Response.new(params[:SAMLResponse])
 
     # insert identity provider discovery logic here
-    response.settings = Account.get_saml_settings
+    response.settings = saml_settings
 
     puts "NAMEID: #{response.name_id}"
 
     if response.is_valid?
       session[:userid] = response.name_id
+      session[:email] = response.attributes['email']
       puts 'Success!'
-      redirect_to :action => :complete
+      redirect to('/success')
     else
       puts 'Fail :('
-      redirect_to :action => :fail
+      session[:email] = "fail fail fail"
+      redirect to('/success')
     end
   end
 
   private
 
   def saml_settings
-    settings = OpenStruct.new(YAML.load_file 'config/saml_settings.yml')
-    settings[:certificate] = File.read('config/server.crt')
-    settings[:private_key] = File.read('config/server.key')
-    settings[:idp_cert] =  File.read('config/idp.crt')
+    settings = OneLogin::RubySaml::Settings.new(YAML.load_file 'config/saml_settings.yml')
+    settings.certificate = File.read('config/server.crt')
+    settings.private_key = File.read('config/server.key')
+    settings.idp_cert =  File.read('config/idp.crt')
     settings
   end
 
