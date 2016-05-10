@@ -68,6 +68,7 @@ class RelyingParty < Sinatra::Base
     settings = OpenStruct.new(YAML.load_file 'config/saml_settings.yml')
     settings[:certificate] = File.read('config/server.crt')
     settings[:private_key] = File.read('config/server.key')
+    settings[:idp_cert] =  File.read('config/idp.crt')
     settings
   end
 
