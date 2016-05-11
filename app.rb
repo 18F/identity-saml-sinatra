@@ -12,7 +12,14 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/' do
-    erb :index
+    agency = params[:agency]
+    whitelist = ['uscis']
+
+    if whitelist.include?(agency)
+      erb :"agency/#{agency}", :layout => false
+    else
+      erb :index
+    end
   end
 
   post '/login/?' do
