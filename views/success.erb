@@ -1,4 +1,10 @@
-<div class="py1 mb3 center">
-  <h2>Success!</h2>
-  <h3>Your email is <%= session[:email] %> </h3>
+<div class="clearfix">
+  <div class="col-12 sm-col-6 mx-auto">
+    <div class="p2 bg-green white center">
+      <div class="h2 bold">Success!</div>
+      <% if session[:email] %>
+      <div>Your email is <strong><%= session[:email] %></strong></div>
+      <% end %>
+    </div>
+  </div>
 </div>
