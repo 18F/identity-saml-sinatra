@@ -26,12 +26,13 @@
   <div class="relative border-bottom p2 clearfix">
     <div class="container sm-show">
       <div class="sm-col">
-        <a href="#!" class="h6">A-Z Index</a> |
-        <a href="#!" class="h6">Get Email Updates</a>
+        <a href="#!" class="h5 btn p0 py1">A-Z Index</a> |
+        <a href="#!" class="h5 btn p0 py1">Get Email Updates</a>
       </div>
       <div class="sm-col-right">
-        <a href="#!" class="h6">Search our Site</a> |
-        <a href="#!" class="h6">Ask a Question</a>
+        <form action="/login" method="POST">
+          <button type="submit" class="btn btn-primary">login.gov →</button>
+        </form>
       </div>
     </div>
   </div>
@@ -66,7 +67,10 @@
     <div class="bg-silver py4 bg-cover bg-hero">
       <div class="sm-show hero-inner"></div>
     </div>
-    <div class="clearfix py2 mxn2 center">
+    <form action="/login" method="POST" class="sm-hide p2 center">
+      <button type="submit" class="btn btn-primary col-12">login.gov →</button>
+    </form>
+    <div class="clearfix p2 mxn2 center">
       <div class="sm-col sm-col-4 px2">
         <img src="/img/uscis/ico-1.png">
         <h2 class="h3 mt0 mb1">Check your Case Status</h2>
