@@ -3,7 +3,7 @@ require 'net/http'
 require 'sinatra/base'
 require 'onelogin/ruby-saml'
 require 'yaml'
-# require_relative 'app/saml_settings'
+
 
 class RelyingParty < Sinatra::Base
   enable :sessions
@@ -28,16 +28,11 @@ class RelyingParty < Sinatra::Base
   end
 
   post '/login/?' do
-    # begin
-      puts 'Login received'
-      request = OneLogin::RubySaml::Authrequest.new
-      puts "Request: #{request}"
-      x = saml_settings
-      redirect to(request.create(saml_settings))
-    # rescue
-    #   Fake a success for now
-    #   call env.merge("PATH_INFO" => '/success', "REQUEST_METHOD" => 'GET')
-    # end
+    puts 'Login received'
+    request = OneLogin::RubySaml::Authrequest.new
+    puts "Request: #{request}"
+    x = saml_settings
+    redirect to(request.create(saml_settings))
   end
 
   get '/success/?' do
@@ -50,7 +45,6 @@ class RelyingParty < Sinatra::Base
 
     # insert identity provider discovery logic here
     response.settings = saml_settings
-
     puts "NAMEID: #{response.name_id}"
 
     if response.is_valid?

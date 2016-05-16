@@ -35,11 +35,4 @@ class FakeIdvaasTest < Test::Unit::TestCase
     assert last_response.ok?
     assert last_response.body.include? 'Success!'
   end
-
-  def test_it_accepts_login_input
-    Net::HTTP.stubs(:post_form).returns('Success')
-    post '/login', '{"input":"some input"}'
-    assert last_response.ok?
-    assert last_response.body.include? 'Success'
-  end
 end
