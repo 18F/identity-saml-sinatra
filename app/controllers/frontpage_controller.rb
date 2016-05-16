@@ -3,5 +3,6 @@ class FrontpageController < ApplicationController
   end
 
   def login
+
   end
 end
