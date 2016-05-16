@@ -21,7 +21,7 @@ class RelyingParty < Sinatra::Base
     whitelist = ['uscis']
 
     if whitelist.include?(agency)
-      erb :"agency/#{agency}", :layout => false
+      erb :"agency/#{agency}/index", :layout => false
     else
       erb :index
     end
@@ -36,7 +36,8 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/success/?' do
-    erb :success
+    # default to uscis success page for now
+    erb :"agency/uscis/success", :layout => false
   end
 
   post '/consume/?' do
