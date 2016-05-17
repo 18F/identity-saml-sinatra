@@ -18,3 +18,5 @@
 /log/*
 !/log/.keep
 /tmp
+
+/config/demo_sp.key
