@@ -18,7 +18,7 @@ class RelyingParty < Sinatra::Base
 
   get '/' do
     agency = params[:agency]
-    whitelist = ['uscis']
+    whitelist = ['uscis', 'sba']
 
     if whitelist.include?(agency)
       erb :"agency/#{agency}/index", :layout => false
