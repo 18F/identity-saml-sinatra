@@ -8,6 +8,10 @@ require 'yaml'
 class RelyingParty < Sinatra::Base
   enable :sessions
 
+  use Rack::Auth::Basic, "Restricted" do |username, password|
+    username == '18f' and password == 'Trust But Verify'
+  end
+
   def init(uri)
     @auth_server_uri = uri
   end
