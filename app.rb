@@ -28,7 +28,6 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", :layout => false
     else
-      session[:agency] = nil
       erb :index
     end
   end
