@@ -65,7 +65,7 @@ class RelyingParty < Sinatra::Base
       redirect to('/success')
     else
       puts 'Fail :('
-      session[:email] = "fail fail fail"
+      # session[:email] = "fail fail fail"
       redirect to('/success')
     end
   end
