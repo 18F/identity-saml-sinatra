@@ -22,7 +22,7 @@ class RelyingParty < Sinatra::Base
 
   get '/' do
     agency = params[:agency]
-    whitelist = ['uscis', 'sba']
+    whitelist = ['uscis', 'sba', 'ed']
 
     if whitelist.include?(agency)
       session[:agency] = agency
