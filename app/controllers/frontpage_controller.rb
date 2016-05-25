@@ -5,4 +5,8 @@ class FrontpageController < ApplicationController
   def login
 
   end
+
+  def login_return
+
+  end
 end
