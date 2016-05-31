@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    dotenv (2.1.1)
     macaddr (1.7.1)
       systemu (~> 2.6.2)
     metaclass (0.0.4)
@@ -33,6 +34,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  dotenv
   mocha
   rack-test
   ruby-saml

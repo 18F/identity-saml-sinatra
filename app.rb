@@ -1,15 +1,17 @@
+require 'dotenv'
 require 'erb'
 require 'net/http'
 require 'sinatra/base'
 require 'onelogin/ruby-saml'
 require 'yaml'
 
+Dotenv.load
 
 class RelyingParty < Sinatra::Base
   enable :sessions
 
   use Rack::Auth::Basic, "Restricted" do |username, password|
-    username == '18f' and password == 'Trust But Verify'
+    username == ENV['SP_NAME'] and password == ENV['SP_PASS']
   end
 
   def init(uri)
