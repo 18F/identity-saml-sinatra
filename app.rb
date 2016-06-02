@@ -66,6 +66,7 @@ class RelyingParty < Sinatra::Base
       redirect to('/success')
     else
       puts 'Fail :('
+      puts response.errors
       # session[:email] = "fail fail fail"
       redirect to('/success')
     end
@@ -74,10 +75,14 @@ class RelyingParty < Sinatra::Base
   private
 
   def saml_settings
-    settings = OneLogin::RubySaml::Settings.new(YAML.load_file 'config/saml_settings.yml')
+    if ENV['SAML_ENV'] == 'local'
+      settings_file = 'config/saml_settings_local.yml'
+    else
+      settings_file = 'config/saml_settings.yml'
+    end
+    settings = OneLogin::RubySaml::Settings.new(YAML.load_file settings_file)
     settings.certificate = File.read('config/demo_sp.crt')
     settings.private_key = File.read('config/demo_sp.key')
-    settings.idp_cert =  File.read('config/idp.crt')
     settings
   end
 
