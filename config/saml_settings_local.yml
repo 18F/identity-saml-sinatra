@@ -1,9 +1,9 @@
-assertion_consumer_service_url: https://identity-rp-dev.apps.cloud.gov/consume
+assertion_consumer_service_url: http://localhost:4567/consume
 assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
-issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:dev
-idp_sso_target_url: https://upaya-idp-demo.18f.gov/api/saml/auth
-idp_slo_target_url: https://upaya-idp-demo.18f.gov/api/saml/logout
-idp_cert_fingerprint: 95c879e4a3402be6e3497d3038cfe98336833565
+issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:localhost
+idp_sso_target_url: http://localhost:3000/api/saml/auth
+idp_slo_target_url: http://localhost:3000/api/saml/logout
+idp_cert_fingerprint: E6:12:DC:4D:93:66:02:E0:74:AE:B8:2C:F8:2C:3A:C5:AA:20:3D:60
 name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
 authn_context: http://idmanagement.gov/ns/assurance/loa/1
 single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST

@@ -13,11 +13,11 @@ May also function as reference RP implementation.
 
     $ bundle exec ruby test/app_test.rb
 
-### Running
+### Running (development mode)
 
-    $ bundle exec ruby app.rb
+    $ SAML_ENV=local bundle exec ruby app.rb
 
 ### Generating a new key + self-signed cert
 
-    openssl req -newkey rsa:2048 -nodes -keyout config/server.key \
-      -x509 -out config/server.crt -config config/openssl.conf
+    openssl req -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
+      -x509 -out config/demo_sp.crt -config config/openssl.conf
