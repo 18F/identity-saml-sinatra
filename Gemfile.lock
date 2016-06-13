@@ -5,11 +5,13 @@ GEM
     macaddr (1.7.1)
       systemu (~> 2.6.2)
     metaclass (0.0.4)
-    mini_portile2 (2.0.0)
+    mini_portile2 (2.1.0)
     mocha (1.1.0)
       metaclass (~> 0.0.1)
-    nokogiri (1.6.7.2)
-      mini_portile2 (~> 2.0.0.rc2)
+    nokogiri (1.6.8)
+      mini_portile2 (~> 2.1.0)
+      pkg-config (~> 1.1.7)
+    pkg-config (1.1.7)
     power_assert (0.2.7)
     rack (1.6.4)
     rack-protection (1.5.3)
@@ -41,5 +43,8 @@ DEPENDENCIES
   sinatra
   test-unit
 
+RUBY VERSION
+   ruby 2.3.0p0
+
 BUNDLED WITH
-   1.11.2
+   1.12.3
