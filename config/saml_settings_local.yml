@@ -3,7 +3,7 @@ assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-PO
 issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:localhost
 idp_sso_target_url: http://localhost:3000/api/saml/auth
 idp_slo_target_url: http://localhost:3000/api/saml/logout
-idp_cert_fingerprint: E6:12:DC:4D:93:66:02:E0:74:AE:B8:2C:F8:2C:3A:C5:AA:20:3D:60
+idp_cert_fingerprint: 8B:D5:C2:E8:9A:2B:CE:B7:4B:95:50:BA:16:79:05:27:17:D1:D3:67
 name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
 authn_context: http://idmanagement.gov/ns/assurance/loa/1
 single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
