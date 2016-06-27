@@ -8,10 +8,12 @@ require 'yaml'
 Dotenv.load
 
 class RelyingParty < Sinatra::Base
-  enable :sessions
+  use Rack::Session::Cookie, :key => 'sinatra_sp'
 
-  use Rack::Auth::Basic, "Restricted" do |username, password|
-    username == ENV['SP_NAME'] and password == ENV['SP_PASS']
+  if ENV['SP_NAME'] && ENV['SP_PASS']
+    use Rack::Auth::Basic, "Restricted" do |username, password|
+      username == ENV['SP_NAME'] && password == ENV['SP_PASS']
+    end
   end
 
   def init(uri)
@@ -30,6 +32,7 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", :layout => false
     else
+      session.delete(:agency)
       erb :index
     end
   end
@@ -51,23 +54,21 @@ class RelyingParty < Sinatra::Base
   end
 
   post '/consume/?' do
-    puts "params: #{params}"
     response = OneLogin::RubySaml::Response.new(params[:SAMLResponse])
 
     # insert identity provider discovery logic here
     response.settings = saml_settings
-    puts "NAMEID: #{response.name_id}"
+    puts "Got SAMLResponse from NAMEID: #{response.name_id}"
 
     if response.is_valid?
       session[:userid] = response.name_id
       session[:email] = response.attributes['email']
-      puts 'Success!'
+      puts 'SAML Success!'
       redirect to('/success')
     else
-      puts 'Fail :('
-      puts response.errors
-      # session[:email] = "fail fail fail"
-      redirect to('/success')
+      puts 'SAML Fail :('
+      @errors = response.errors
+      erb :failure
     end
   end
 

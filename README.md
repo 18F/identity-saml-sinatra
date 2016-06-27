@@ -1,9 +1,7 @@
-Identity-RP
-===========
+Sinatra-based Identity SP
+=========================
 
-Mock relying party (RP) app for validating IdP and IdV APIs.
-
-May also function as reference RP implementation.
+Example service provide (SP) app for use with 18F's IdP.
 
 ### Setup
 
