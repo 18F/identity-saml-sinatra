@@ -38,7 +38,6 @@ class RelyingParty < Sinatra::Base
     puts 'Login received'
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    x = saml_settings
     redirect to(request.create(saml_settings))
   end
 
