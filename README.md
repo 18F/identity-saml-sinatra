@@ -13,9 +13,14 @@ May also function as reference RP implementation.
 
     $ bundle exec ruby test/app_test.rb
 
-### Running (development mode)
+### Running (local development mode)
 
     $ SAML_ENV=local bundle exec ruby app.rb
+    
+### Running (on cloud.gov)
+
+    $ bin/cloud_deploy [dev or demo]
+(Note: You'll need to be logged into cloud.gov first)
 
 ### Generating a new key + self-signed cert
 
