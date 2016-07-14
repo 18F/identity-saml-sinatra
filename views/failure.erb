@@ -1,0 +1,10 @@
+<div class="clearfix">
+  <div class="col-12 sm-col-6 mx-auto">
+    <div class="h5 p2 bg-red white center">
+      <span class="bold caps">Authentication Failure!</span>
+      <% @errors.each do |err| %>
+        <p><%= err %></strong>.</p>
+      <% end %>
+    </div>
+  </div>
+</div>
