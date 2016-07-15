@@ -14,6 +14,15 @@
   </style>
 </head>
 <body>
+  <% if logout_msg %>
+   <div class="logout">
+    <% if logout_msg == 'ok' %>
+      <div class="h5 p2 bg-green white center">You have been logged out.</div>
+    <% else %>
+      <div class="h5 p2 bg-red white center"Logout failed!</div>
+    <% end %>
+   </div>
+  <% end %>
   <div class="relative bg-navy white px2 py1 clearfix">
     <div class="container sm-show">
       <div class="sm-col-right">
