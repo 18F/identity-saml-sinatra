@@ -1,4 +1,13 @@
 <div class="py1 mb3 center">
+  <% if logout_msg %>
+   <div class="logout">
+    <% if logout_msg == 'ok' %>
+      You have been logged out.
+    <% else %>
+      Logout failed!
+    <% end %>
+   </div>
+  <% end %>
   <h2>Please log in to continue.</h2>
   <form action="/login" method="POST">
     <button type="submit" class="btn btn-outline bg-white navy">

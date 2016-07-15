@@ -1,7 +1,8 @@
 source 'https://rubygems.org'
 
-ruby '2.3.0'
+ruby '2.3.1'
 
+gem 'hashie'
 gem 'mocha'
 gem 'ruby-saml'
 gem 'rack-test'
