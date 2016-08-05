@@ -1,6 +1,8 @@
 Sinatra-based Identity SP
 =========================
 
+[![Build Status](https://travis-ci.org/18F/identity-sp-sinatra.svg?branch=master)](https://travis-ci.org/18F/identity-sp-sinatra)
+
 Example service provide (SP) app for use with 18F's IdP.
 
 ### Setup
