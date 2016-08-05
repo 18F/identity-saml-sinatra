@@ -10,7 +10,7 @@ require 'yaml'
 Dotenv.load
 
 class RelyingParty < Sinatra::Base
-  use Rack::Session::Cookie, :key => 'sinatra_sp'
+  use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
 
   if ENV['SP_NAME'] && ENV['SP_PASS']
     use Rack::Auth::Basic, "Restricted" do |username, password|
@@ -30,13 +30,13 @@ class RelyingParty < Sinatra::Base
     agency = params[:agency]
     whitelist = ['uscis', 'sba', 'ed']
 
-    @logout_msg = session.delete(:logout)
+    logout_msg = session.delete(:logout)
     if whitelist.include?(agency)
       session[:agency] = agency
-      erb :"agency/#{agency}/index", :layout => false
+      erb :"agency/#{agency}/index", :layout => false, locals: { logout_msg: logout_msg }
     else
       session.delete(:agency)
-      erb :index
+      erb :index, locals: { logout_msg: logout_msg }
     end
   end
 

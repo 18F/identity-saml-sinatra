@@ -5,15 +5,15 @@ Example service provide (SP) app for use with 18F's IdP.
 
 ### Setup
 
-    $ bundle install
+    $ make setup
 
 ### Testing
 
-    $ bundle exec ruby test/app_test.rb
+    $ make test
 
 ### Running (local development mode)
 
-    $ SAML_ENV=local bundle exec ruby app.rb
+    $ make run
     
 ### Running (on cloud.gov)
 
@@ -24,3 +24,5 @@ Example service provide (SP) app for use with 18F's IdP.
 
     openssl req -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
       -x509 -out config/demo_sp.crt -config config/openssl.conf
+
+    openssl x509 -fingerprint -noout -in config/demo_sp.crt
