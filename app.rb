@@ -12,12 +12,6 @@ Dotenv.load
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
 
-  if ENV['SP_NAME'] && ENV['SP_PASS']
-    use Rack::Auth::Basic, "Restricted" do |username, password|
-      username == ENV['SP_NAME'] && password == ENV['SP_PASS']
-    end
-  end
-
   def init(uri)
     @auth_server_uri = uri
   end
