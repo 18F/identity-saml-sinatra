@@ -1,3 +1,6 @@
+setup:
+	bundle install
+
 test:
 	bundle exec ruby test/app_test.rb
 
