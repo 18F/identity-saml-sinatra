@@ -31,7 +31,7 @@ Example service provide (SP) app for use with 18F's IdP.
 
 ### Generating a new key + self-signed cert
 
-    openssl req -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
+    openssl req -days 3650 -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
       -x509 -out config/demo_sp.crt -config config/openssl.conf
 
     openssl x509 -fingerprint -noout -in config/demo_sp.crt
