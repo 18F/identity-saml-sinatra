@@ -13,6 +13,8 @@ GEM
       capistrano (~> 3.1)
       sshkit (~> 1.2)
     capistrano-harrow (0.5.3)
+    capistrano-passenger (0.2.0)
+      capistrano (~> 3.0)
     dotenv (2.1.1)
     hashie (3.4.4)
     i18n (0.7.0)
@@ -53,6 +55,7 @@ PLATFORMS
 DEPENDENCIES
   capistrano
   capistrano-bundler
+  capistrano-passenger
   dotenv
   hashie
   mocha

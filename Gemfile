@@ -13,4 +13,5 @@ gem 'dotenv'
 group :deploy do
   gem 'capistrano'
   gem 'capistrano-bundler'
+  gem 'capistrano-passenger'
 end

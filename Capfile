@@ -4,6 +4,9 @@ require 'capistrano/setup'
 # Includes default deployment tasks
 require 'capistrano/deploy'
 
+# support for passenger
+require 'capistrano/passenger'
+
 # support for bundler
 require 'capistrano/bundler'
 
