@@ -13,6 +13,9 @@ set :linked_files, %w(.env
                       config/demo_sp.key
                       config/saml_settings_demo.yml)
 set :linked_dirs, %w(bin log tmp/pids tmp/cache tmp/sockets vendor/bundle public/system)
+set :passenger_roles, [:app]
+set :passenger_restart_wait, 5
+set :passenger_restart_runner, :sequence
 set :rack_env, :production
 set :repo_url, ->{ "https://github.com/18F/identity-#{fetch(:application)}.git" }
 set :ssh_options, forward_agent: false, user: 'ubuntu'
@@ -22,13 +25,6 @@ set :tmp_dir, ->{ "/srv/#{fetch(:application)}" }
 # TASKS
 #########
 namespace :deploy do
-  desc 'Restart application'
-  task :restart do
-    on roles(:app), in: :sequence, wait: 5 do
-      execute :touch, release_path.join('tmp/restart.txt')
-    end
-  end
-
   desc 'Write deploy information to deploy.json'
   task :deploy_json do
     on roles(:app, :web), in: :parallel do
