@@ -2,7 +2,7 @@ language: ruby
 notifications:
   email: false
 rvm:
-  - ruby-2.3.1
+  - ruby-2.3.3
 cache: bundler
 sudo: false
 before_script:
