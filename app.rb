@@ -113,16 +113,10 @@ class RelyingParty < Sinatra::Base
   end
 
   def saml_settings
-    if ENV['SAML_ENV'] == 'local'
-      settings_file = 'config/saml_settings_local.yml'
-    elsif ENV['SAML_ENV'] == 'dev'
-      settings_file = 'config/saml_settings_dev.yml'
-    else
-      settings_file = 'config/saml_settings_demo.yml'
-    end
+    settings_file = "config/saml_settings_#{ENV['SAML_ENV']}.yml"
     base_config = Hashie::Mash.new(YAML.load_file(settings_file))
-    base_config.certificate = File.read('config/demo_sp.crt')
-    base_config.private_key = File.read('config/demo_sp.key')
+    base_config.certificate = File.read("config/#{ENV['SAML_ENV']}_sp.crt")
+    base_config.private_key = File.read("config/#{ENV['SAML_ENV']}_sp.key")
     OneLogin::RubySaml::Settings.new(base_config)
   end
 
