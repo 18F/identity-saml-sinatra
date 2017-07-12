@@ -3,7 +3,9 @@ assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-PO
 issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:demo
 idp_sso_target_url: https://idp.demo.login.gov/api/saml/auth
 idp_slo_target_url: https://idp.demo.login.gov/api/saml/logout
-idp_cert_fingerprint: 8B:D5:C2:E8:9A:2B:CE:B7:4B:95:50:BA:16:79:05:27:17:D1:D3:67
+# 68:19:... is the fingerprint of the SAML IDP cert CN=int.login.gov
+# Serial: 0xf41d6ee2e4675981, Issued: July 11 2017, Expires: July 11 2018
+idp_cert_fingerprint: 68:19:E0:CB:D2:44:A0:CD:B7:D1:80:8A:E2:34:E4:22:90:41:DF:10
 name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
 authn_context: http://idmanagement.gov/ns/assurance/loa/1
 single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
