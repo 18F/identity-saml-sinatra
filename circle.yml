@@ -1,0 +1,10 @@
+machine:
+  ruby:
+    version:
+      2.3.3
+dependencies:
+  pre:
+    - make setup
+test:
+  override:
+    - make test
