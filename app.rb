@@ -1,13 +1,11 @@
-require 'dotenv'
 require 'erb'
 require 'hashie/mash'
+require 'login_gov/hostdata'
 require 'net/http'
+require 'onelogin/ruby-saml'
 require 'pp'
 require 'sinatra/base'
-require 'onelogin/ruby-saml'
 require 'yaml'
-
-Dotenv.load
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
@@ -113,14 +111,8 @@ class RelyingParty < Sinatra::Base
   end
 
   def saml_settings
-    if ENV['SAML_ENV'] == 'local'
-      settings_file = 'config/saml_settings_local.yml'
-    elsif ENV['SAML_ENV'] == 'dev'
-      settings_file = 'config/saml_settings_dev.yml'
-    else
-      settings_file = 'config/saml_settings_demo.yml'
-    end
-    base_config = Hashie::Mash.new(YAML.load_file(settings_file))
+    template = File.read('config/saml_settings.yml')
+    base_config = Hashie::Mash.new(YAML.load(ERB.new(template).result(binding)))
     base_config.certificate = File.read('config/demo_sp.crt')
     base_config.private_key = File.read('config/demo_sp.key')
     OneLogin::RubySaml::Settings.new(base_config)
