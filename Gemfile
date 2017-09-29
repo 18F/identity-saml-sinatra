@@ -9,9 +9,3 @@ gem 'rack-test'
 gem 'sinatra'
 gem 'test-unit'
 gem 'dotenv'
-
-group :deploy do
-  gem 'capistrano'
-  gem 'capistrano-bundler'
-  gem 'capistrano-passenger'
-end
