@@ -75,12 +75,12 @@ class RelyingParty < Sinatra::Base
   end
 
   post '/consume/?' do
-    response = OneLogin::RubySaml::Response.new(params[:SAMLResponse])
+    response = OneLogin::RubySaml::Response.new(
+      params.fetch(:SAMLResponse), settings: saml_settings
+    )
 
     user_uuid = response.name_id.gsub(/^_/, '')
 
-    # insert identity provider discovery logic here
-    response.settings = saml_settings
     puts "Got SAMLResponse from NAMEID: #{user_uuid}"
 
     if response.is_valid?
@@ -112,7 +112,7 @@ class RelyingParty < Sinatra::Base
 
   def saml_settings
     template = File.read('config/saml_settings.yml')
-    base_config = Hashie::Mash.new(YAML.load(ERB.new(template).result(binding)))
+    base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
     base_config.certificate = File.read('config/demo_sp.crt')
     base_config.private_key = File.read('config/demo_sp.key')
     OneLogin::RubySaml::Settings.new(base_config)
