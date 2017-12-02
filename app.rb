@@ -76,7 +76,7 @@ class RelyingParty < Sinatra::Base
 
   post '/consume/?' do
     response = OneLogin::RubySaml::Response.new(
-      params.fetch(:SAMLResponse), settings: saml_settings
+      params.fetch('SAMLResponse'), settings: saml_settings
     )
 
     user_uuid = response.name_id.gsub(/^_/, '')
