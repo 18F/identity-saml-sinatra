@@ -1,0 +1,35 @@
+<% if LoginGov::Hostdata.in_datacenter? %>
+<%
+  idp_host = case LoginGov::Hostdata.env
+             when 'prod'
+               "secure.#{LoginGov::Hostdata.domain}"
+             else
+               "idp.#{LoginGov::Hostdata.env}.#{LoginGov::Hostdata.domain}"
+             end
+%>
+assertion_consumer_service_url: https://sp-sinatra.<%= LoginGov::Hostdata.env %>.<%= LoginGov::Hostdata.domain %>/consume
+issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:<%= LoginGov::Hostdata.env %>
+idp_sso_target_url: https://<%= idp_host %>/api/saml/auth
+idp_slo_target_url: https://<%= idp_host %>/api/saml/logout
+# 68:19:... is the fingerprint of the SAML IDP cert CN=int.login.gov
+# Serial: 0xf41d6ee2e4675981, Issued: July 11 2017, Expires: July 11 2018
+idp_cert_fingerprint: 68:19:E0:CB:D2:44:A0:CD:B7:D1:80:8A:E2:34:E4:22:90:41:DF:10
+<% else %>
+assertion_consumer_service_url: http://localhost:4567/consume
+issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:localhost
+idp_sso_target_url: http://localhost:3000/api/saml/auth
+idp_slo_target_url: http://localhost:3000/api/saml/logout
+idp_cert_fingerprint: 8B:D5:C2:E8:9A:2B:CE:B7:4B:95:50:BA:16:79:05:27:17:D1:D3:67
+<% end %>
+
+assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
+authn_context: http://idmanagement.gov/ns/assurance/loa/1
+single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+allowed_clock_drift: 60
+security:
+  authn_requests_signed: true
+  logout_requests_signed: true
+  embed_sign: true
+  digest_method: http://www.w3.org/2001/04/xmlenc#sha256
+  signature_method: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
