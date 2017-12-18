@@ -5,6 +5,8 @@ Sinatra-based Identity SP
 
 Example service provide (SP) app for use with 18F's IdP.
 
+These instructions assume [`identity-idp`](https://github.com/18F/identity-idp) is also running locally at `http://localhost:3000`. This sample sp is configured to run on `http://localhost:4567`.
+
 ### Setup
 
     $ make setup
