@@ -23,10 +23,10 @@ GEM
     nokogiri (1.8.1)
       mini_portile2 (~> 2.3.0)
     power_assert (1.1.1)
-    rack (2.0.3)
+    rack (2.0.4)
     rack-protection (2.0.0)
       rack
-    rack-test (0.8.2)
+    rack-test (1.0.0)
       rack (>= 1.0, < 3)
     ruby-saml (1.6.0)
       nokogiri (>= 1.5.10)
