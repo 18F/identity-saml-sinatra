@@ -47,20 +47,14 @@ class RelyingParty < Sinatra::Base
   end
 
   post '/slo_logout/?' do
-    puts 'SLO response received'
-    slo_response = OneLogin::RubySaml::Logoutresponse.new(
-      params[:SAMLResponse],
-      saml_settings
-    )
-    if slo_response.validate
-      puts 'Logout OK'
-      logout_session
-      session[:logout] = 'ok'
-      redirect to(home_page)
+    if params[:SAMLRequest]
+      puts 'SLO request came from IdP'
+      idp_logout_request
+    elsif params[:SAMLResponse]
+      puts 'SLO response received'
+      validate_slo_response
     else
-      puts 'Logout failed'
-      session[:logout] = 'fail'
-      redirect to(home_page)
+      sp_logout_request
     end
   end
 
@@ -116,6 +110,62 @@ class RelyingParty < Sinatra::Base
     base_config.certificate = File.read('config/demo_sp.crt')
     base_config.private_key = File.read('config/demo_sp.key')
     OneLogin::RubySaml::Settings.new(base_config)
+  end
+
+  def idp_logout_request
+    logout_request = OneLogin::RubySaml::SloLogoutrequest.new(
+      params[:SAMLRequest],
+      settings: saml_settings
+    )
+    if logout_request.is_valid?
+      redirect_to_logout(logout_request)
+    else
+      render_logout_error(logout_request)
+    end
+  end
+
+  def redirect_to_logout(logout_request)
+    puts "IdP initiated Logout for #{logout_request.nameid}"
+    logout_session
+    logout_response = OneLogin::RubySaml::SloLogoutresponse.new.create(
+      saml_settings,
+      logout_request.id,
+      nil,
+      RelayState: params[:RelayState]
+    )
+    redirect to(logout_response)
+  end
+
+  def render_logout_error(logout_request)
+    error_msg = "IdP initiated LogoutRequest was not valid: #{logout_request.errors}"
+    puts error_msg
+    @errors = error_msg
+    erb :failure
+  end
+
+  def validate_slo_response
+    slo_response = idp_logout_response
+    if slo_response.validate
+      puts 'Logout OK'
+      logout_session
+      session[:logout] = 'ok'
+      redirect to(home_page)
+    else
+      puts 'Logout failed'
+      session[:logout] = 'fail'
+      redirect to(home_page)
+    end
+  end
+
+  def idp_logout_response
+    OneLogin::RubySaml::Logoutresponse.new(params[:SAMLResponse], saml_settings)
+  end
+
+  def sp_logout_request
+    settings = saml_settings.dup
+    settings.name_identifier_value = session[:user_id]
+    logout_request = OneLogin::RubySaml::Logoutrequest.new.create(settings)
+    redirect to(logout_request)
   end
 
   run! if app_file == $0
