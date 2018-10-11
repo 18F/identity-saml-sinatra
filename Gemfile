@@ -5,7 +5,7 @@ ruby '~> 2.3.5'
 
 gem 'hashie'
 gem 'mocha'
-gem 'ruby-saml'
+gem 'ruby-saml', '>= 1.9.0'
 gem 'rack-test'
 gem 'sinatra'
 gem 'test-unit'
