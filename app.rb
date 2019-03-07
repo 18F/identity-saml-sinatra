@@ -107,8 +107,17 @@ class RelyingParty < Sinatra::Base
   def saml_settings
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
+
+    # TODO: don't use the demo cert and key in EC2 environments
+    if LoginGov::Hostdata.in_datacenter? && (
+      LoginGov::Hostdata.domain == 'login.gov' ||
+      LoginGov::Hostdata.env == 'prod'
+    )
+      raise NotImplementedError.new('Refusing to use demo cert in production')
+    end
     base_config.certificate = File.read('config/demo_sp.crt')
     base_config.private_key = File.read('config/demo_sp.key')
+
     OneLogin::RubySaml::Settings.new(base_config)
   end
 

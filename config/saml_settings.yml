@@ -1,20 +1,51 @@
-<% if LoginGov::Hostdata.in_datacenter? %>
+---
 <%
+require 'aws-sdk-s3'
+require 'digest/sha1'
+require 'login_gov/hostdata'
+require 'openssl'
+
+if LoginGov::Hostdata.in_datacenter?
   idp_host = case LoginGov::Hostdata.env
              when 'prod'
                "secure.#{LoginGov::Hostdata.domain}"
              else
                "idp.#{LoginGov::Hostdata.env}.#{LoginGov::Hostdata.domain}"
              end
+
+  # Rotate this annually
+  year_suffix = '2019'
+
+  # Get EC2 metadata so we can discover region and account ID
+  ec2 = LoginGov::Hostdata::EC2.load
+
+  # Fetch the IDP SAML cert from S3
+  bucket_name = "login-gov.secrets.#{ec2.account_id}-#{ec2.region}"
+  s3_key = "#{LoginGov::Hostdata.env}/saml#{year_suffix}.crt"
+  s3 = Aws::S3::Client.new(
+    region: ec2.region,
+    http_open_timeout: 5,
+    http_read_timeout: 5
+  )
+  resp = s3.get_object(bucket: bucket_name, key: s3_key)
+
+  idp_saml_cert = OpenSSL::X509::Certificate.new(resp.body.read)
+  idp_saml_cert_fingerprint = Digest::SHA1.hexdigest(idp_saml_cert.to_der).scan(/../).join(':').upcase
 %>
-assertion_consumer_service_url: https://sp-sinatra.<%= LoginGov::Hostdata.env %>.<%= LoginGov::Hostdata.domain %>/consume
-issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:<%= LoginGov::Hostdata.env %>
-idp_sso_target_url: https://<%= idp_host %>/api/saml/auth
-idp_slo_target_url: https://<%= idp_host %>/api/saml/logout
-# 68:19:... is the fingerprint of the SAML IDP cert CN=int.login.gov
-# Serial: 0xf41d6ee2e4675981, Issued: July 11 2017, Expires: July 11 2018
-idp_cert_fingerprint: 68:19:E0:CB:D2:44:A0:CD:B7:D1:80:8A:E2:34:E4:22:90:41:DF:10
+# Config for EC2 environments
+assertion_consumer_service_url: "https://sp-sinatra.<%= LoginGov::Hostdata.env %>.<%= LoginGov::Hostdata.domain %>/consume"
+issuer: "urn:gov:gsa:SAML:2.0.profiles:sp:sso:<%= LoginGov::Hostdata.env %>"
+idp_sso_target_url: "https://<%= idp_host %>/api/saml/auth<%= year_suffix %>"
+idp_slo_target_url: "https://<%= idp_host %>/api/saml/logout<%= year_suffix %>"
+idp_cert_fingerprint: "<%= idp_saml_cert_fingerprint %>"
+# Cert info:
+#   year_suffix: <%= year_suffix %>
+#   not_before: <%= idp_saml_cert.not_before.to_date %>
+#   not_after: <%= idp_saml_cert.not_after.to_date %>
+#   s3_path: s3://<%= bucket_name %>/<%= s3_key %>
+
 <% else %>
+# Config for local development
 assertion_consumer_service_url: http://localhost:4567/consume
 issuer: urn:gov:gsa:SAML:2.0.profiles:sp:sso:localhost
 idp_sso_target_url: http://localhost:3000/api/saml/auth
@@ -33,3 +64,5 @@ security:
   embed_sign: true
   digest_method: http://www.w3.org/2001/04/xmlenc#sha256
   signature_method: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
+
+# vim: set ft=eruby :
