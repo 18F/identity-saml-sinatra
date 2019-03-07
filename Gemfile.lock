@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/18F/identity-hostdata.git
-  revision: 4340185470fdf07c5d06658c2aa5ce6c904bb898
+  revision: b5587588601670f762bbc79f0f4a8468064d9401
   branch: master
   specs:
-    identity-hostdata (0.3.2)
+    identity-hostdata (0.3.3)
       aws-sdk-s3 (~> 1.8)
 
 GEM
