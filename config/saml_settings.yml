@@ -1,7 +1,6 @@
 ---
 <%
 require 'aws-sdk-s3'
-require 'aws-sdk-sts'
 require 'digest/sha1'
 require 'login_gov/hostdata'
 require 'openssl'
@@ -17,11 +16,17 @@ if LoginGov::Hostdata.in_datacenter?
   # Rotate this annually
   year_suffix = '2019'
 
+  # Get EC2 metadata so we can discover region and account ID
+  ec2 = LoginGov::Hostdata::EC2.load
+
   # Fetch the IDP SAML cert from S3
-  aws_account_id = Aws::STS::Client.new.get_caller_identity.account
-  bucket_name = "login-gov.secrets.#{aws_account_id}-us-west-2"
+  bucket_name = "login-gov.secrets.#{ec2.account_id}-#{ec2.region}"
   s3_key = "#{LoginGov::Hostdata.env}/saml#{year_suffix}.crt"
-  s3 = Aws::S3::Client.new
+  s3 = Aws::S3::Client.new(
+    region: ec2.region,
+    http_open_timeout: 5,
+    http_read_timeout: 5
+  )
   resp = s3.get_object(bucket: bucket_name, key: s3_key)
 
   idp_saml_cert = OpenSSL::X509::Certificate.new(resp.body.read)
