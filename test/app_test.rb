@@ -27,7 +27,7 @@ class FakeIdvaasTest < Test::Unit::TestCase
   def test_agency_template_no_override
     get '/?agency=foo'
     assert !(last_response.body.include? 'img/uscis/logo.png')
-    assert last_response.body.include? 'img/seal.png'
+    assert last_response.body.include? 'us_flag_small.png'
   end
 
   def test_it_shows_success
