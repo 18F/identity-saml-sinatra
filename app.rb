@@ -23,12 +23,13 @@ class RelyingParty < Sinatra::Base
     whitelist = ['uscis', 'sba', 'ed']
 
     logout_msg = session.delete(:logout)
+    login_msg = session.delete(:login)
     if whitelist.include?(agency)
       session[:agency] = agency
-      erb :"agency/#{agency}/index", :layout => false, locals: { logout_msg: logout_msg }
+      erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       session.delete(:agency)
-      erb :index, locals: { logout_msg: logout_msg }
+      erb :index, locals: { logout_msg: logout_msg, login_msg: login_msg }
     end
   end
 
@@ -64,7 +65,8 @@ class RelyingParty < Sinatra::Base
     if !agency.nil?
       erb :"agency/#{agency}/success", :layout => false
     else
-      erb :success
+      session[:login] = 'ok'
+      redirect to('/')
     end
   end
 

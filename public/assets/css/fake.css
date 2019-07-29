@@ -23,6 +23,22 @@
     vertical-align: bottom;
 }
 
+.p0 {
+  padding: 0;
+}
+.p1 {
+  padding: 0.5rem;
+}
+.p2 {
+  padding: 1rem;
+}
+.p3 {
+  padding: 2rem;
+}
+.p4 {
+  padding: 4rem;
+}
+
 .py1 {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;

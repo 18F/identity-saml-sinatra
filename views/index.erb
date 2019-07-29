@@ -8,68 +8,86 @@
 </div>
 <div class="usa-overlay"></div>
 <header class="usa-header usa-header--extended" role="banner">
-   <% if logout_msg %>
-     <div class="logout">
-       <% if logout_msg == 'ok' %>
-         You have been logged out.
-       <% else %>
-         Logout failed!
-       <% end %>
-     </div>
-   <% end %>
-   <div class="usa-navbar">
-      <div class="usa-logo" id="extended-logo">
-         <em class="usa-logo__text"><a href="/" title="Home" aria-label="Home">OpenID Connect Example</a></em>
+  <% if logout_msg %>
+    <div class="clearfix">
+      <div class="col-12 sm-col-6 mx-auto">
+      <% if logout_msg == 'ok' %>
+        <div class="h5 p1 bg-green white center">
+          <span class="bold caps">You have been logged out.</span>
+        </div>
+      <% else %>
+        <div class="h5 p1 bg-red white center">
+          <span class="bold caps">Logout failed!</span>
+        </div>
+      <% end %>
       </div>
-      <button class="usa-menu-btn">Menu</button>
-   </div>
-   <nav role="navigation" class="usa-nav">
-      <div class="usa-nav__inner">
-         <button class="usa-nav__close"><img src="/assets/img/close.svg" alt="close"></button>
-         <ul class="usa-nav__primary usa-accordion">
-            <li class="usa-nav__primary-item">
-               <button class="usa-accordion__button usa-nav__link  usa-current" aria-expanded="false" aria-controls="extended-nav-section-one"><span>Our process</span></button>
-               <ul id="extended-nav-section-one" class="usa-nav__submenu">
-                  <li class="usa-nav__submenu-item">
-                     <a href="#">Navigation link</a>
-                  </li>
-                  <li class="usa-nav__submenu-item">
-                     <a href="#">Navigation link</a>
-                  </li>
-                  <li class="usa-nav__submenu-item">
-                     <a href="#">Navigation link</a>
-                  </li>
-               </ul>
+    </div>
+  <% end %>
+  <% if login_msg %>
+    <div class="clearfix">
+      <div class="col-12 sm-col-6 mx-auto">
+        <div class="h5 p1 bg-green white center">
+          <span class="bold caps">Login was a Success!</span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+  <div class="usa-navbar">
+    <div class="usa-logo" id="extended-logo">
+      <em class="usa-logo__text"><a href="/" title="Home" aria-label="Home">SAML Example</a></em>
+    </div>
+    <button class="usa-menu-btn">Menu</button>
+  </div>
+  <nav role="navigation" class="usa-nav">
+    <div class="usa-nav__inner">
+      <button class="usa-nav__close"><img src="/assets/img/close.svg" alt="close"></button>
+      <ul class="usa-nav__primary usa-accordion">
+        <li class="usa-nav__primary-item">
+          <button class="usa-accordion__button usa-nav__link  usa-current" aria-expanded="false" aria-controls="extended-nav-section-one"><span>Our process</span></button>
+          <ul id="extended-nav-section-one" class="usa-nav__submenu">
+            <li class="usa-nav__submenu-item">
+              <a href="#">Navigation link</a>
             </li>
-            <li class="usa-nav__primary-item">
-               <a class="usa-nav__link" href="javascript:void(0)"><span>Explore</span></a>
+            <li class="usa-nav__submenu-item">
+              <a href="#">Navigation link</a>
             </li>
-            <li class="usa-nav__primary-item">
-               <a class="usa-nav__link" href="javascript:void(0)"><span>News</span></a>
+            <li class="usa-nav__submenu-item">
+              <a href="#">Navigation link</a>
             </li>
-         </ul>
-         <div class="usa-nav__secondary">
-            <div class="sign-in-wrap">
-              <form action="/login" method="POST">
-                <button type="submit"  class="usa-button usa-button--outline sign-in-bttn" style="float:right">
-                  <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                     <path fill="currentColor" d="M416 448h-84c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h84c17.7 0 32-14.3 32-32V160c0-17.7-14.3-32-32-32h-84c-6.6 0-12-5.4-12-12V76c0-6.6 5.4-12 12-12h84c53 0 96 43 96 96v192c0 53-43 96-96 96zm-47-201L201 79c-15-15-41-4.5-41 17v96H24c-13.3 0-24 10.7-24 24v96c0 13.3 10.7 24 24 24h136v96c0 21.5 26 32 41 17l168-168c9.3-9.4 9.3-24.6 0-34z"></path>
-                  </svg>
-                  Sign in
-                </button>
-              </form>
-              <!--
-               <a class="usa-button usa-button--outline sign-in-bttn" href="" style="float:right">
-                  <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                     <path fill="currentColor" d="M416 448h-84c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h84c17.7 0 32-14.3 32-32V160c0-17.7-14.3-32-32-32h-84c-6.6 0-12-5.4-12-12V76c0-6.6 5.4-12 12-12h84c53 0 96 43 96 96v192c0 53-43 96-96 96zm-47-201L201 79c-15-15-41-4.5-41 17v96H24c-13.3 0-24 10.7-24 24v96c0 13.3 10.7 24 24 24h136v96c0 21.5 26 32 41 17l168-168c9.3-9.4 9.3-24.6 0-34z"></path>
-                  </svg>
-                  Sign in
-               </a>
-                -->
+          </ul>
+        </li>
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href="javascript:void(0)"><span>Explore</span></a>
+        </li>
+        <li class="usa-nav__primary-item">
+          <a class="usa-nav__link" href="javascript:void(0)"><span>News</span></a>
+        </li>
+      </ul>
+      <div class="usa-nav__secondary">
+        <% if session[:email] %>
+          <div class="sign-in-wrap">
+            <div class="center p2"><%= session[:email] %></div>
+            <div>
+            <form action="/logout" method="POST" class="center sm-show">
+              <button type="submit" class="p1 usa-button usa-button--outline">Log out</button>
+            </form>
             </div>
-         </div>
+          </div>
+        <% else %>
+          <div class="sign-in-wrap">
+            <form action="/login" method="POST">
+              <button type="submit"  class="usa-button usa-button--outline sign-in-bttn" style="float:right">
+                <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                  <path fill="currentColor" d="M416 448h-84c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h84c17.7 0 32-14.3 32-32V160c0-17.7-14.3-32-32-32h-84c-6.6 0-12-5.4-12-12V76c0-6.6 5.4-12 12-12h84c53 0 96 43 96 96v192c0 53-43 96-96 96zm-47-201L201 79c-15-15-41-4.5-41 17v96H24c-13.3 0-24 10.7-24 24v96c0 13.3 10.7 24 24 24h136v96c0 21.5 26 32 41 17l168-168c9.3-9.4 9.3-24.6 0-34z"></path>
+                </svg>
+                Sign in
+              </button>
+            </form>
+          </div>
+        <% end %>
       </div>
-   </nav>
+    </div>
+  </nav>
 </header>
 <main id="main-content">
   <section class="usa-hero">
