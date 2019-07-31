@@ -4,7 +4,7 @@
 </div>
 <div class="py1 bg-navy white fs-12p line-height-1 center">
   <img class="mr1 align-bottom" src="/assets/img/us-flag.png" alt="U.S. flag" width="18" height="12">
-  A DEMO website of the United States government  
+  A DEMO website of the United States government
 </div>
 <div class="usa-overlay"></div>
 <header class="usa-header usa-header--extended" role="banner">
@@ -96,12 +96,14 @@
         <% if session[:email] %>
           <h1 class="usa-hero__heading">
             <span class="usa-hero__heading--alt">Welcome back!</span>
-            Wasn't it easy to log in?
+            You are logged in.
           </h1>
-          <p>You can log out by clicking on the 'Log out' button above.</p>
+          <p>When finished, use the previous 'Log out' button to sign out.</p>
         <% else %>
-          <h1 class="usa-hero__heading"><span class="usa-hero__heading--alt">Get started:</span>It's easy to create your account
-          </h1><p>You can create your new account in just a few short minutes.</p>
+          <h1 class="usa-hero__heading">
+            <span class="usa-hero__heading--alt">Let's get started!</span>
+            It's easy to make an account
+          </h1><p>Setting it up takes just a few, short steps.</p>
           <a class="usa-button" href="javascript:void(0);">Create an account</a>
         <% end %>
       </div>
