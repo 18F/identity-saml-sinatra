@@ -32,7 +32,6 @@ class FakeIdvaasTest < Test::Unit::TestCase
 
   def test_it_shows_success
     get '/success/'
-    assert last_response.ok?
-    assert last_response.body.include? 'Success!'
+    assert last_response.redirect?
   end
 end
