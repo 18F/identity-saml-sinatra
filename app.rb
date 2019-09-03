@@ -33,11 +33,20 @@ class RelyingParty < Sinatra::Base
     end
   end
 
-  post '/login/?' do
-    puts 'Login received'
+  post '/login_get/?' do
+    puts "Logging in via GET"
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
     redirect to(request.create(saml_settings))
+  end
+
+  post '/login_post/?' do
+    puts "Logging in via POST"
+    saml_request = OneLogin::RubySaml::Authrequest.new
+    puts "Request: #{saml_request}"
+    post_params = saml_request.create_params(saml_settings, 'RelayState' => params[:id])
+    login_url   = saml_settings.idp_sso_target_url
+    erb :login_post, locals: { login_url: login_url, post_params: post_params }
   end
 
   post '/logout/?' do
