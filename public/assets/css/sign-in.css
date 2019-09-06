@@ -4,8 +4,13 @@
 .sign-in-wrap {
   clear: both;
 }
+.sign-in-wrap form {
+  float: left;
+}
 .sign-in-bttn {
   float: right;
+  margin: 5px;
+  min-width: 185px;
 }
 .sign-in-bttn svg {
   margin-bottom: -2px;
