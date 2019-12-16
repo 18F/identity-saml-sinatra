@@ -70,7 +70,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 2.3.5p376
+   ruby 2.5.5p157
 
 BUNDLED WITH
-   1.17.1
+   1.17.3
