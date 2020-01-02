@@ -1,3 +1,4 @@
+require 'dotenv/load'
 require 'erb'
 require 'hashie/mash'
 require 'login_gov/hostdata'

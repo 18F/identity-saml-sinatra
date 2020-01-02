@@ -25,6 +25,7 @@ GEM
       aws-sigv4 (~> 1.0)
     aws-sigv4 (1.0.3)
     coderay (1.1.2)
+    dotenv (2.7.5)
     hashie (3.6.0)
     jmespath (1.4.0)
     metaclass (0.0.4)
@@ -60,6 +61,7 @@ PLATFORMS
 
 DEPENDENCIES
   aws-sdk-s3 (~> 1.30)
+  dotenv
   hashie
   identity-hostdata!
   mocha
@@ -70,7 +72,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 2.3.5p376
+   ruby 2.5.5p157
 
 BUNDLED WITH
-   1.17.1
+   1.17.3
