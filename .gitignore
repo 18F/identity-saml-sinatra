@@ -42,3 +42,5 @@ build/
 .rvmrc
 
 .byebug_history
+
+public/api/deploy.json
