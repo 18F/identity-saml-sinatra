@@ -1,6 +1,6 @@
 <a class="usa-skipnav" href="#main-content">Skip to main content</a>
 <div class="py1 bg-maroon white fs-12p line-height-1 center">
-  TEST SITE - Do not use real personal information (demo purposes only) - TEST SITE
+  TEST Do not use real personal information (demo purposes only) TEST
 </div>
 <div class="py1 bg-navy white fs-12p line-height-1 center">
   <img class="mr1 align-bottom" src="/assets/img/us-flag.png" alt="U.S. flag" width="18" height="12">
@@ -74,21 +74,21 @@
             </div>
           </div>
         <% else %>
+          <ul class="usa-nav__secondary-links sign-in-type-wrap">
+            <li class="usa-nav__secondary-item">
+              <a href="?ial=1"><span class="<%= ial1_link_class %>">IAL1</span></a>
+            </li>
+            <li class="usa-nav__secondary-item">
+              <a href="?ial=2"><span class="<%= ial2_link_class %>">IAL2</span></a>
+            </li>
+          </ul>
           <div class="sign-in-wrap">
-            <form action="/login_get" method="POST">
-              <button type="submit"  class="usa-button usa-button--outline sign-in-bttn" style="float:right">
+            <form action="<%= login_path %>" method="POST" style="float:right">
+              <button type="submit"  class="usa-button usa-button--outline sign-in-bttn">
                 <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
                   <path fill="currentColor" d="M416 448h-84c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h84c17.7 0 32-14.3 32-32V160c0-17.7-14.3-32-32-32h-84c-6.6 0-12-5.4-12-12V76c0-6.6 5.4-12 12-12h84c53 0 96 43 96 96v192c0 53-43 96-96 96zm-47-201L201 79c-15-15-41-4.5-41 17v96H24c-13.3 0-24 10.7-24 24v96c0 13.3 10.7 24 24 24h136v96c0 21.5 26 32 41 17l168-168c9.3-9.4 9.3-24.6 0-34z"></path>
                 </svg>
-                Sign in via GET
-              </button>
-            </form>
-            <form action="/login_post" method="POST">
-              <button type="submit"  class="usa-button usa-button--outline sign-in-bttn" style="float:right">
-                <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-                  <path fill="currentColor" d="M416 448h-84c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h84c17.7 0 32-14.3 32-32V160c0-17.7-14.3-32-32-32h-84c-6.6 0-12-5.4-12-12V76c0-6.6 5.4-12 12-12h84c53 0 96 43 96 96v192c0 53-43 96-96 96zm-47-201L201 79c-15-15-41-4.5-41 17v96H24c-13.3 0-24 10.7-24 24v96c0 13.3 10.7 24 24 24h136v96c0 21.5 26 32 41 17l168-168c9.3-9.4 9.3-24.6 0-34z"></path>
-                </svg>
-                Sign in via POST
+                Sign in
               </button>
             </form>
           </div>
@@ -119,6 +119,25 @@
           </form>
         <% end %>
       </div>
+
+      <% if session[:attributes] %>
+        <% userinfo = JSON.parse(session[:attributes]) %>
+        <div class="userinfo">
+          <div class="p2 clearfix bg-white fg-black">
+            <span>Received user info:</span>
+            <ul>
+              <% userinfo.each_pair do |key, vals| %>
+                <li><code><%= key.inspect %>:
+                  <% vals.each do |val| %>
+                    <% val = maybe_redact_ssn(val) if key.to_s == 'ssn' %>
+                    <%= val.inspect %>
+                  <% end %>
+                </code></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
     </div>
   </section>
   <section class="grid-container usa-section">

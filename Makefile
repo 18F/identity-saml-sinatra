@@ -1,4 +1,7 @@
-setup:
+.env: .env.example
+	cp -n .env.example .env
+
+setup: .env
 	bundle install
 
 test:
