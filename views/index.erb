@@ -119,6 +119,25 @@
           </form>
         <% end %>
       </div>
+
+      <% if session[:attributes] %>
+        <% userinfo = JSON.parse(session[:attributes]) %>
+        <div class="userinfo">
+          <div class="p2 clearfix bg-white fg-black">
+            <span>Received user info:</span>
+            <ul>
+              <% userinfo.each_pair do |key, vals| %>
+                <li><code><%= key.inspect %>:
+                  <% vals.each do |val| %>
+                    <% val = maybe_redact_ssn(val) if key.to_s == 'ssn' %>
+                    <%= val.inspect %>
+                  <% end %>
+                </code></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
     </div>
   </section>
   <section class="grid-container usa-section">

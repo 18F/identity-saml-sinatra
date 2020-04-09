@@ -95,7 +95,7 @@ class RelyingParty < Sinatra::Base
     agency = session[:agency]
     puts "Success!"
     if !agency.nil?
-      erb :"agency/#{agency}/success", :layout => false
+      erb :"agency/#{agency}/success", layout: false
     else
       session[:login] = 'ok'
       redirect to('/')
@@ -114,6 +114,8 @@ class RelyingParty < Sinatra::Base
     if response.is_valid?
       session[:userid] = user_uuid
       session[:email] = response.attributes['email']
+      session[:attributes] = response.attributes.to_h.to_json
+
       puts 'SAML Success!'
       redirect to('/success')
     else
@@ -128,6 +130,7 @@ class RelyingParty < Sinatra::Base
   def logout_session
     session.delete(:userid)
     session.delete(:email)
+    session.delete(:attributes)
   end
 
   def home_page
@@ -211,6 +214,10 @@ class RelyingParty < Sinatra::Base
     settings.name_identifier_value = session[:user_id]
     logout_request = OneLogin::RubySaml::Logoutrequest.new.create(settings)
     redirect to(logout_request)
+  end
+
+  def maybe_redact_ssn(ssn)
+    ssn&.gsub(/\d/, '#')
   end
 
   run! if app_file == $0
