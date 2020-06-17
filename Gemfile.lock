@@ -33,29 +33,31 @@ GEM
     mini_portile2 (2.4.0)
     mocha (1.7.0)
       metaclass (~> 0.0.1)
-    mustermann (1.0.3)
+    mustermann (1.1.1)
+      ruby2_keywords (~> 0.0.1)
     nokogiri (1.10.8)
       mini_portile2 (~> 2.4.0)
     power_assert (1.1.3)
     pry (0.12.2)
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
-    rack (2.0.8)
-    rack-protection (2.0.4)
+    rack (2.2.3)
+    rack-protection (2.0.8.1)
       rack
     rack-test (1.1.0)
       rack (>= 1.0, < 3)
     rake (13.0.1)
     ruby-saml (1.9.0)
       nokogiri (>= 1.5.10)
-    sinatra (2.0.4)
+    ruby2_keywords (0.0.2)
+    sinatra (2.0.8.1)
       mustermann (~> 1.0)
       rack (~> 2.0)
-      rack-protection (= 2.0.4)
+      rack-protection (= 2.0.8.1)
       tilt (~> 2.0)
     test-unit (3.2.8)
       power_assert
-    tilt (2.0.8)
+    tilt (2.0.10)
 
 PLATFORMS
   ruby
@@ -67,14 +69,14 @@ DEPENDENCIES
   identity-hostdata!
   mocha
   pry
-  rack-test
+  rack-test (>= 1.1.0)
   rake
   ruby-saml
-  sinatra
+  sinatra (>= 2.0.4)
   test-unit
 
 RUBY VERSION
    ruby 2.6.5p114
 
 BUNDLED WITH
-   2.1.4
+   1.17.3
