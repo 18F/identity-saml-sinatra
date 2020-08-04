@@ -41,12 +41,13 @@ class RelyingParty < Sinatra::Base
       ial = params[:ial] || '1'
       ial1_link_class = 'text-underline' if ial == '1'
       ial2_link_class = 'text-underline' if ial == '2'
+      aal = params[:aal] || '2'
 
       session.delete(:agency)
       erb :index, locals: {
         logout_msg: logout_msg,
         login_msg: login_msg,
-        login_path: "/login_get?ial=#{ial}",
+        login_path: "/login_get?ial=#{ial}&aal=#{aal}",
         ial1_link_class: ial1_link_class,
         ial2_link_class: ial2_link_class,
       }
@@ -58,7 +59,8 @@ class RelyingParty < Sinatra::Base
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
     ial = params[:ial] || '1'
-    redirect to(request.create(saml_settings(ial: ial)))
+    aal = params[:aal] || '2'
+    redirect to(request.create(saml_settings(ial: ial, aal: aal)))
   end
 
   post '/login_post/?' do
@@ -141,11 +143,13 @@ class RelyingParty < Sinatra::Base
     end
   end
 
-  def saml_settings(ial: nil)
+  def saml_settings(ial: nil, aal: nil)
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
-    base_config.authn_context = "http://idmanagement.gov/ns/assurance/ial/#{ial}" if ial
+    base_config.ial_context = "http://idmanagement.gov/ns/assurance/ial/#{ial}" if ial
+    base_config.aal_context = "http://idmanagement.gov/ns/assurance/aal/#{aal}" if aal
+    base_config.authn_context = [base_config.ial_context, base_config.aal_context].compact
 
     # TODO: don't use the demo cert and key in EC2 environments
     if LoginGov::Hostdata.in_datacenter? && (
