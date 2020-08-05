@@ -7,7 +7,7 @@ idp_cert_fingerprint: <%= ENV['idp_cert_fingerprint'] %>
 
 assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
 name_identifier_format: urn:oasis:names:tc:SAML:1.1:nameid-format:persistent
-authn_context: http://idmanagement.gov/ns/assurance/loa/1
+ial_context: http://idmanagement.gov/ns/assurance/ial/1
 single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
 allowed_clock_drift: 60
 security:
