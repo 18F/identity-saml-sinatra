@@ -39,17 +39,14 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = params[:ial] || '1'
-      ial1_link_class = 'text-underline' if ial == '1'
-      ial2_link_class = 'text-underline' if ial == '2'
-      aal = params[:aal] || '2'
+      aal = params[:aal]
 
       session.delete(:agency)
       erb :index, locals: {
+        ial: ial,
         logout_msg: logout_msg,
         login_msg: login_msg,
         login_path: "/login_get?ial=#{ial}&aal=#{aal}",
-        ial1_link_class: ial1_link_class,
-        ial2_link_class: ial2_link_class,
       }
     end
   end
