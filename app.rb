@@ -39,17 +39,14 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = params[:ial] || '1'
-      ial1_link_class = 'text-underline' if ial == '1'
-      ial2_link_class = 'text-underline' if ial == '2'
-      aal = params[:aal] || '2'
+      aal = params[:aal]
 
       session.delete(:agency)
       erb :index, locals: {
+        ial: ial,
         logout_msg: logout_msg,
         login_msg: login_msg,
         login_path: "/login_get?ial=#{ial}&aal=#{aal}",
-        ial1_link_class: ial1_link_class,
-        ial2_link_class: ial2_link_class,
       }
     end
   end
@@ -67,8 +64,7 @@ class RelyingParty < Sinatra::Base
     puts "Logging in via POST"
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
-    ial = params[:ial] || '1'
-    settings = saml_settings(ial: ial)
+    settings = saml_settings(ial: params[:ial], aal: params[:aal])
     post_params = saml_request.create_params(settings, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url: login_url, post_params: post_params }
@@ -147,8 +143,26 @@ class RelyingParty < Sinatra::Base
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
-    base_config.ial_context = "http://idmanagement.gov/ns/assurance/ial/#{ial}" if ial
-    base_config.aal_context = "http://idmanagement.gov/ns/assurance/aal/#{aal}" if aal
+    ial_context = case ial
+    when nil, '', '1'
+      'http://idmanagement.gov/ns/assurance/ial/1'
+    when '2'
+      'http://idmanagement.gov/ns/assurance/ial/2'
+    when '2-strict'
+      'http://idmanagement.gov/ns/assurance/ial/2?strict=true'
+    when '0'
+      'http://idmanagement.gov/ns/assurance/ial/0'
+    end
+
+    aal_context = case aal
+    when '3'
+      'http://idmanagement.gov/ns/assurance/aal/3'
+    when '3-hspd12'
+      'http://idmanagement.gov/ns/assurance/aal/3?hspd12=true'
+    end
+
+    base_config.ial_context = ial_context if ial_context
+    base_config.aal_context = aal_context if aal_context
     base_config.authn_context = [base_config.ial_context, base_config.aal_context].compact
 
     # TODO: don't use the demo cert and key in EC2 environments
