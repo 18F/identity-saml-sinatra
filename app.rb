@@ -39,11 +39,14 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = params[:ial] || '1'
-      aal = params[:aal]
+      aal = params[:aal] || '1'
+      skip_encryption = params[:skip_encryption]
 
       session.delete(:agency)
       erb :index, locals: {
         ial: ial,
+        aal: aal,
+        skip_encryption: skip_encryption,
         logout_msg: logout_msg,
         login_msg: login_msg,
         login_path: "/login_get?ial=#{ial}&aal=#{aal}",
@@ -57,7 +60,10 @@ class RelyingParty < Sinatra::Base
     puts "Request: #{request}"
     ial = params[:ial] || '1'
     aal = params[:aal] || '2'
-    redirect to(request.create(saml_settings(ial: ial, aal: aal)))
+    skip_encryption = params[:skip_encryption]
+    request_url = request.create(saml_settings(ial: ial, aal: aal))
+    request_url += "&skip_encryption=#{skip_encryption}" if skip_encryption
+    redirect to(request_url)
   end
 
   post '/login_post/?' do
@@ -65,7 +71,7 @@ class RelyingParty < Sinatra::Base
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
     settings = saml_settings(ial: params[:ial], aal: params[:aal])
-    post_params = saml_request.create_params(settings, 'RelayState' => params[:id])
+    post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url: login_url, post_params: post_params }
   end
@@ -155,6 +161,8 @@ class RelyingParty < Sinatra::Base
     end
 
     aal_context = case aal
+    when '2'
+      'http://idmanagement.gov/ns/assurance/aal/2'
     when '3'
       'http://idmanagement.gov/ns/assurance/aal/3'
     when '3-hspd12'
