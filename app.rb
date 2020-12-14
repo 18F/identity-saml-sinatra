@@ -30,25 +30,23 @@ class RelyingParty < Sinatra::Base
     @auth_server_uri ||= URI('https://localhost:1234')
   end
 
-  # Removes all non-alphanumeric characters, leaves in dashes
-  # Useful for extracting slugs from params
-  def sanitize(param)
-    param.to_s.gsub(/[^0-9a-zA-Z-]/, '').presence
+  def get_param(key, acceptable_values)
+    value = params[key]
+    value if acceptable_values.include?(value)
   end
 
   get '/' do
-    agency = sanitize(params[:agency])
-    whitelist = ['uscis', 'sba', 'ed']
+    agency = get_param(:agency, ['uscis', 'sba', 'ed'])
 
     logout_msg = session.delete(:logout)
     login_msg = session.delete(:login)
-    if whitelist.include?(agency)
+    if agency
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = sanitize(params[:ial]) || '1'
-      aal = sanitize(params[:aal]) || '1'
-      skip_encryption = sanitize(params[:skip_encryption])
+      ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
+      aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '1'
+      skip_encryption = get_param(:skip_encryption, ['true', 'false'])
 
       login_path = '/login_get?' + {
         ial: ial,
@@ -71,9 +69,9 @@ class RelyingParty < Sinatra::Base
     puts "Logging in via GET"
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = sanitize(params[:ial]) || '1'
-    aal = sanitize(params[:aal]) || '2'
-    skip_encryption = sanitize(params[:skip_encryption])
+    ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
+    aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '1'
+    skip_encryption = get_param(:skip_encryption, ['true', 'false'])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
