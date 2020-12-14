@@ -18,6 +18,11 @@ class FakeIdvaasTest < Test::Unit::TestCase
     assert last_response.body.include? '<form action="/login" method="POST">'
   end
 
+  def test_main_page_xss
+    get '/?ial=%22%20onmouseover=%22alert(document.domain)%22%20k=%22'
+    assert !last_response.body.include?('alert(document.domain)')
+  end
+
   def test_agency_template_override
     get '/?agency=uscis'
     assert last_response.body.include? 'img/uscis/logo.png'
