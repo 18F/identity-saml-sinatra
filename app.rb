@@ -70,7 +70,7 @@ class RelyingParty < Sinatra::Base
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
     ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
-    aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '1'
+    aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
     skip_encryption = get_param(:skip_encryption, ['true', 'false'])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
