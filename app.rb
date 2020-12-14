@@ -7,6 +7,8 @@ require 'onelogin/ruby-saml'
 require 'pp'
 require 'sinatra/base'
 require 'yaml'
+require 'active_support/core_ext/object/to_query'
+require 'active_support/core_ext/object/blank'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
@@ -28,6 +30,10 @@ class RelyingParty < Sinatra::Base
     @auth_server_uri ||= URI('https://localhost:1234')
   end
 
+  def sanitize(param)
+    param.to_s.gsub(/[^0-9a-zA-Z-]/, '').presence
+  end
+
   get '/' do
     agency = params[:agency]
     whitelist = ['uscis', 'sba', 'ed']
@@ -38,9 +44,14 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = params[:ial] || '1'
-      aal = params[:aal] || '1'
+      ial = sanitize(params[:ial]) || '1'
+      aal = sanitize(params[:aal]) || '1'
       skip_encryption = params[:skip_encryption]
+
+      login_path = '/login_get?' + {
+        ial: ial,
+        aal: aal,
+      }.to_query
 
       session.delete(:agency)
       erb :index, locals: {
@@ -49,7 +60,7 @@ class RelyingParty < Sinatra::Base
         skip_encryption: skip_encryption,
         logout_msg: logout_msg,
         login_msg: login_msg,
-        login_path: "/login_get?ial=#{ial}&aal=#{aal}",
+        login_path: login_path,
       }
     end
   end
@@ -62,7 +73,7 @@ class RelyingParty < Sinatra::Base
     aal = params[:aal] || '2'
     skip_encryption = params[:skip_encryption]
     request_url = request.create(saml_settings(ial: ial, aal: aal))
-    request_url += "&skip_encryption=#{skip_encryption}" if skip_encryption
+    request_url += { skip_encryption: skip_encryption }.to_query if skip_encryption
     redirect to(request_url)
   end
 
@@ -139,7 +150,7 @@ class RelyingParty < Sinatra::Base
 
   def home_page
     if session[:agency]
-      "/?agency=#{session[:agency]}"
+      '/?' + { agency: session[:agency] }.to_query
     else
       '/'
     end
