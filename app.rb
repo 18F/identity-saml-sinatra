@@ -30,6 +30,8 @@ class RelyingParty < Sinatra::Base
     @auth_server_uri ||= URI('https://localhost:1234')
   end
 
+  # Removes all non-alphanumeric characters, leaves in dashes
+  # Useful for extracting slugs from params
   def sanitize(param)
     param.to_s.gsub(/[^0-9a-zA-Z-]/, '').presence
   end
