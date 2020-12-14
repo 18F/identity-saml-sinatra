@@ -75,7 +75,7 @@ class RelyingParty < Sinatra::Base
     aal = params[:aal] || '2'
     skip_encryption = params[:skip_encryption]
     request_url = request.create(saml_settings(ial: ial, aal: aal))
-    request_url += { skip_encryption: skip_encryption }.to_query if skip_encryption
+    request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
   end
 
