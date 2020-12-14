@@ -45,7 +45,7 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
-      aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '1'
+      aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
       skip_encryption = get_param(:skip_encryption, ['true', 'false'])
 
       login_path = '/login_get?' + {
