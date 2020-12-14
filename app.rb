@@ -37,7 +37,7 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/' do
-    agency = params[:agency]
+    agency = sanitize(params[:agency])
     whitelist = ['uscis', 'sba', 'ed']
 
     logout_msg = session.delete(:logout)
@@ -48,7 +48,7 @@ class RelyingParty < Sinatra::Base
     else
       ial = sanitize(params[:ial]) || '1'
       aal = sanitize(params[:aal]) || '1'
-      skip_encryption = params[:skip_encryption]
+      skip_encryption = sanitize(params[:skip_encryption])
 
       login_path = '/login_get?' + {
         ial: ial,
@@ -71,9 +71,9 @@ class RelyingParty < Sinatra::Base
     puts "Logging in via GET"
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = params[:ial] || '1'
-    aal = params[:aal] || '2'
-    skip_encryption = params[:skip_encryption]
+    ial = sanitize(params[:ial]) || '1'
+    aal = sanitize(params[:aal]) || '2'
+    skip_encryption = sanitize(params[:skip_encryption])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
