@@ -1,27 +1,51 @@
-Sinatra-based Identity SP
-=========================
+identity-saml-sinatra
+=====================
 
-[![CircleCI](https://circleci.com/gh/18F/identity-sp-sinatra.svg?style=svg)](https://circleci.com/gh/18F/identity-sp-sinatra)
+[![CircleCI](https://circleci.com/gh/18F/identity-saml-sinatra.svg?style=svg)](https://circleci.com/gh/18F/identity-sp-sinatra)
 
-Example service provide (SP) app for use with 18F's IdP.
+An example service provider application for use with [Login.gov](https://login.gov/)'s identity provider.
 
-These instructions assume [`identity-idp`](https://github.com/18F/identity-idp) is also running locally at `http://localhost:3000`. This sample sp is configured to run on `http://localhost:4567`.
+## Running locally
 
-### Setup
+These instructions assume [`identity-idp`](https://github.com/18F/identity-idp) is also running locally at http://localhost:3000 .
 
-    $ make setup
+1. Set up the environment with:
 
-### Testing
+  ```
+  $ make setup
+  ```
 
-    $ make test
+2. Generate a new key and self-signed certificate
 
-### Running (local development mode)
-
-    $ make run
-
-### Generating a new key + self-signed cert
-
-    openssl req -days 3650 -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
+  ```
+  $ openssl req -days 3650 -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
       -x509 -out config/demo_sp.crt -config config/openssl.conf
 
-    openssl x509 -fingerprint -noout -in config/demo_sp.crt
+  $ openssl x509 -fingerprint -noout -in config/demo_sp.crt
+  ```
+
+3. Run the application server:
+
+  ```
+  $ make run
+  ```
+
+4. To run specs:
+
+  ```
+  $ make test
+  ```
+
+This sample service provider is configured to run on http://localhost:4567 by default. Optionally, you can assign a custom hostname or port by passing `HOST=` or `PORT=` environment variables when starting the application server.
+
+## Contributing
+
+See [CONTRIBUTING](CONTRIBUTING.md) for additional information.
+
+## Public domain
+
+This project is in the worldwide [public domain](LICENSE.md). As stated in [CONTRIBUTING](CONTRIBUTING.md):
+
+> This project is in the public domain within the United States, and copyright and related rights in the work worldwide are waived through the [CC0 1.0 Universal public domain dedication](https://creativecommons.org/publicdomain/zero/1.0/).
+>
+> All contributions to this project will be released under the CC0 dedication. By submitting a pull request, you are agreeing to comply with this waiver of copyright interest.
