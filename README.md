@@ -15,22 +15,13 @@ These instructions assume [`identity-idp`](https://github.com/18F/identity-idp) 
   $ make setup
   ```
 
-2. Generate a new key and self-signed certificate
-
-  ```
-  $ openssl req -days 3650 -newkey rsa:2048 -nodes -keyout config/demo_sp.key \
-      -x509 -out config/demo_sp.crt -config config/openssl.conf
-
-  $ openssl x509 -fingerprint -noout -in config/demo_sp.crt
-  ```
-
-3. Run the application server:
+2. Run the application server:
 
   ```
   $ make run
   ```
 
-4. To run specs:
+3. To run specs:
 
   ```
   $ make test
