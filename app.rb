@@ -1,26 +1,17 @@
 require 'dotenv/load'
 require 'erb'
 require 'hashie/mash'
-require 'login_gov/hostdata'
 require 'net/http'
 require 'onelogin/ruby-saml'
 require 'pp'
 require 'sinatra/base'
+require 'uri'
 require 'yaml'
 require 'active_support/core_ext/object/to_query'
 require 'active_support/core_ext/object/blank'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
-
-  if LoginGov::Hostdata.in_datacenter?
-    configure do
-      enable :logging
-      file = File.new("/srv/sp-saml-sinatra/shared/log/production.log", 'a+')
-      file.sync = true
-      use Rack::CommonLogger, file
-    end
-  end
 
   def init(uri)
     @auth_server_uri = uri
@@ -184,17 +175,34 @@ class RelyingParty < Sinatra::Base
     base_config.aal_context = aal_context if aal_context
     base_config.authn_context = [base_config.ial_context, base_config.aal_context].compact
 
-    # TODO: don't use the demo cert and key in EC2 environments
-    if LoginGov::Hostdata.in_datacenter? && (
-      LoginGov::Hostdata.domain == 'login.gov' ||
-      LoginGov::Hostdata.env == 'prod'
-    )
-      raise NotImplementedError.new('Refusing to use demo cert in production')
-    end
-    base_config.certificate = File.read('config/demo_sp.crt')
-    base_config.private_key = File.read('config/demo_sp.key')
+    base_config.certificate = saml_sp_certificate
+    base_config.private_key = saml_sp_private_key
 
     OneLogin::RubySaml::Settings.new(base_config)
+  end
+
+  def saml_sp_certificate
+    return @saml_sp_certificate if defined?(@saml_sp_certificate)
+
+    if running_in_prod_env? && !ENV['sp_cert']
+      raise NotImplementedError.new('Refusing to use demo cert in production')
+    end
+
+    @saml_sp_certificate = ENV['sp_cert'] || File.read('config/demo_sp.crt')
+  end
+
+  def saml_sp_private_key
+    return @saml_sp_private_key if defined?(@saml_sp_private_key)
+
+    if running_in_prod_env? && !ENV['sp_private_key']
+      raise NotImplementedError.new('Refusing to use demo private key in production')
+    end
+
+    @saml_sp_private_key = ENV['sp_private_key'] || File.read('config/demo_sp.key')
+  end
+
+  def running_in_prod_env?
+    @running_in_prod_env ||- URI.parse(ENV['idp_sso_target_url']).hostname.match?(/login\.gov/)
   end
 
   def idp_logout_request
