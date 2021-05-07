@@ -12,7 +12,6 @@ gem 'rack-test'
 gem 'rake'
 gem 'sinatra'
 gem 'test-unit'
-gem 'identity-hostdata', github: '18F/identity-hostdata', branch: 'master'
 gem 'activesupport'
 
 group :development do

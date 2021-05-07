@@ -1,7 +1,6 @@
 require 'dotenv/load'
 require 'erb'
 require 'hashie/mash'
-require 'login_gov/hostdata'
 require 'net/http'
 require 'onelogin/ruby-saml'
 require 'pp'
@@ -13,15 +12,6 @@ require 'active_support/core_ext/object/blank'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
-
-  if LoginGov::Hostdata.in_datacenter?
-    configure do
-      enable :logging
-      file = File.new("/srv/sp-saml-sinatra/shared/log/production.log", 'a+')
-      file.sync = true
-      use Rack::CommonLogger, file
-    end
-  end
 
   def init(uri)
     @auth_server_uri = uri
