@@ -202,7 +202,7 @@ class RelyingParty < Sinatra::Base
   end
 
   def running_in_prod_env?
-    @running_in_prod_env ||- URI.parse(ENV['idp_sso_target_url']).hostname.match?(/login\.gov/)
+    @running_in_prod_env ||= URI.parse(ENV['idp_sso_target_url']).hostname.match?(/login\.gov/)
   end
 
   def idp_logout_request
