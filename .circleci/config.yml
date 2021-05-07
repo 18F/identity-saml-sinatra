@@ -97,5 +97,6 @@ workflows:
           matrix:
             parameters:
               space:
+                - staging
                 - int
                 - dev
