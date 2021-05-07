@@ -198,7 +198,7 @@ class RelyingParty < Sinatra::Base
       raise NotImplementedError.new('Refusing to use demo cert in production')
     end
 
-    @saml_sp_certificate = ENV['sp_cert'] || File.read('config/demo_sp.key')
+    @saml_sp_certificate = ENV['sp_cert'] || File.read('config/demo_sp.crt')
   end
 
   def saml_sp_private_key
@@ -208,7 +208,7 @@ class RelyingParty < Sinatra::Base
       raise NotImplementedError.new('Refusing to use demo private key in production')
     end
 
-    @saml_sp_private_key = ENV['sp_private_key'] || File.read('config/demo_sp.crt')
+    @saml_sp_private_key = ENV['sp_private_key'] || File.read('config/demo_sp.key')
   end
 
   def running_in_prod_env?
