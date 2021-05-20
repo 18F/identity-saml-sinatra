@@ -36,7 +36,7 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
-      aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
+      aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
       skip_encryption = get_param(:skip_encryption, ['true', 'false'])
 
       login_path = '/login_get?' + {
@@ -61,7 +61,7 @@ class RelyingParty < Sinatra::Base
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
     ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
-    aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
+    aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
     skip_encryption = get_param(:skip_encryption, ['true', 'false'])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
@@ -171,6 +171,8 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/aal/3'
     when '3-hspd12'
       'http://idmanagement.gov/ns/assurance/aal/3?hspd12=true'
+    else
+      nil
     end
 
     base_config.ial_context = ial_context if ial_context
