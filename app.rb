@@ -35,8 +35,8 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
-      aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
+      ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
+      aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
       skip_encryption = get_param(:skip_encryption, ['true', 'false'])
 
       login_path = '/login_get?' + {
@@ -60,8 +60,8 @@ class RelyingParty < Sinatra::Base
     puts "Logging in via GET"
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = get_param(:ial, ['1', '2', '2-strict', '0']) || '1'
-    aal = get_param(:aal, ['1', '2', '3', '3-hspd12']) || '2'
+    ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
+    aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
     skip_encryption = get_param(:skip_encryption, ['true', 'false'])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
@@ -152,7 +152,7 @@ class RelyingParty < Sinatra::Base
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
     ial_context = case ial
-    when nil, '', '1'
+    when '1'
       'http://idmanagement.gov/ns/assurance/ial/1'
     when '2'
       'http://idmanagement.gov/ns/assurance/ial/2'
@@ -160,6 +160,8 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/ial/2?strict=true'
     when '0'
       'http://idmanagement.gov/ns/assurance/ial/0'
+    else
+      nil
     end
 
     aal_context = case aal
@@ -169,6 +171,8 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/aal/3'
     when '3-hspd12'
       'http://idmanagement.gov/ns/assurance/aal/3?hspd12=true'
+    else
+      nil
     end
 
     base_config.ial_context = ial_context if ial_context
