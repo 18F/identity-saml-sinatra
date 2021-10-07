@@ -81,7 +81,7 @@ DEPENDENCIES
   test-unit
 
 RUBY VERSION
-   ruby 2.6.5p114
+   ruby 2.7.3p183
 
 BUNDLED WITH
    2.2.20
