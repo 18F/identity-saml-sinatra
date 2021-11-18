@@ -43,7 +43,7 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/ruby:2.6.5
+      - image: circleci/ruby:2.7.3
     working_directory: ~/identity-saml-sinatra
     parameters:
       space:
