@@ -72,7 +72,10 @@ class RelyingParty < Sinatra::Base
     puts "Logging in via POST"
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
-    settings = saml_settings(ial: params[:ial], aal: params[:aal])
+    ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
+    aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
+    skip_encryption = get_param(:skip_encryption, ['true', 'false'])
+    settings = saml_settings(ial: ial, aal: aal)
     post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url: login_url, post_params: post_params }
