@@ -6,11 +6,10 @@ default:
   image: ruby:2.7.3
 
 cache:
-  - key
-      files:
-        - Gemfile.lock
+  files:
+    - Gemfile.lock
   paths:
-    - vendor/bundle
+    - vendor/ruby
 
 before_script:
   - bundle config set path 'vendor'
@@ -24,7 +23,7 @@ build:
   stage: build
   image: ruby:2.7.3
   script:
-    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
     - bundle exec rake login:deploy_json
 
 test:
@@ -37,13 +36,11 @@ test:
 deploy:
   stage: deploy
   image: ruby:2.7.3
-  before_script:
+  script:
     -  curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
     - sudo dpkg -i cf-cli_amd64.deb
     - cf -v
-
-  script:
-    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
     - bundle exec rake login:deploy_json
     - cf login -a https://api.fr.cloud.gov -u "4fbf18ec-1497-433f-814f-8c175041a6f1" -p $CF_PASS -o "gsa-login-prototyping" -s "$SPACE"
     - cf push $SPACE-identity-saml-sinatra
