@@ -6,8 +6,9 @@ default:
   image: ruby:2.7.3
 
 cache:
-  files:
-    - Gemfile.lock
+  - key:
+      files:
+        - Gemfile.lock
   paths:
     - vendor/ruby
 
