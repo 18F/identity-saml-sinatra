@@ -48,3 +48,9 @@ deploy:
 parallel:
   matrix:
     SPACE: [prod, staging, int, dev]
+
+# Sync from GitHub
+include:
+  project: 'lg/identity-gitlab'
+  ref: 'main'
+  file: '.gitlab-ci-sync.yml'
