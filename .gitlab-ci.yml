@@ -9,8 +9,8 @@ cache:
   - key:
       files:
         - Gemfile.lock
-  paths:
-    - vendor/ruby
+    paths:
+      - vendor/ruby
 
 before_script:
   - bundle config set path 'vendor'
