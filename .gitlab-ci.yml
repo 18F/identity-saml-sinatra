@@ -6,9 +6,9 @@ default:
   image: ruby:2.7.3
 
 cache:
-  key: $CI_COMMIT_REF_SLUG
+  key:
     files:
-        - Gemfile.lock
+      - Gemfile.lock
   paths:
     - vendor/ruby
 
