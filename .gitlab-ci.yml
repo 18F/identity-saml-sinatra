@@ -6,14 +6,14 @@ default:
   image: ruby:2.7.3
 
 cache:
-  - key:
-      files:
+  key: $CI_COMMIT_REF_SLUG
+    files:
         - Gemfile.lock
-    paths:
-      - vendor/ruby
+  paths:
+    - vendor/ruby
 
 before_script:
-  - bundle config set path 'vendor'
+  - bundle config set path 'vendor/ruby'
 
 stages:
   - build
