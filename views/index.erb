@@ -75,7 +75,7 @@
           </div>
         <% else %>
           <div class="sign-in-wrap">
-            <form action="<%= login_path %>" method="POST" style="float:right">
+            <form action="<%= login_path %>" method="GET" style="float:right">
               <div class="sign-in-wrap clearfix">
                 <button type="submit"  class="usa-button usa-button--outline sign-in-bttn">
                   <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
@@ -117,6 +117,7 @@
                       ['2', 'IAL  2'],
                       ['2-strict', 'IAL 2 (strict)'],
                       ['0', 'IAL Max'],
+                      ['step-up', 'Step-up Flow'],
                     ].each do |value, label| %>
                       <option value="<%= value %>"
                               <%= 'selected="true"' if ial == value %>

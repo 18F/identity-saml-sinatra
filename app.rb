@@ -27,7 +27,7 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/' do
-    agency = get_param(:agency, ['uscis', 'sba', 'ed'])
+    agency = get_param(:agency, %w[uscis sba ed])
 
     logout_msg = session.delete(:logout)
     login_msg = session.delete(:login)
@@ -35,9 +35,10 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
-      aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
-      skip_encryption = get_param(:skip_encryption, ['true', 'false'])
+      ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+      aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+      ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+      skip_encryption = get_param(:skip_encryption, %w[true false])
 
       login_path = '/login_get?' + {
         ial: ial,
@@ -56,25 +57,27 @@ class RelyingParty < Sinatra::Base
     end
   end
 
-  post '/login_get/?' do
-    puts "Logging in via GET"
+  get '/login_get/?' do
+    puts 'Logging in via GET'
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
-    aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
-    skip_encryption = get_param(:skip_encryption, ['true', 'false'])
+    ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+    aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    skip_encryption = get_param(:skip_encryption, %w[true false])
     request_url = request.create(saml_settings(ial: ial, aal: aal))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
   end
 
   post '/login_post/?' do
-    puts "Logging in via POST"
+    puts 'Logging in via POST'
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
-    ial = get_param(:ial, ['sp', '1', '2', '2-strict', '0']) || '1'
-    aal = get_param(:aal, ['sp', '1', '2', '3', '3-hspd12']) || '2'
-    skip_encryption = get_param(:skip_encryption, ['true', 'false'])
+    ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+    aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    skip_encryption = get_param(:skip_encryption, %w[true false])
     settings = saml_settings(ial: ial, aal: aal)
     post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
@@ -102,7 +105,7 @@ class RelyingParty < Sinatra::Base
 
   get '/success/?' do
     agency = session[:agency]
-    puts "Success!"
+    puts 'Success!'
     if !agency.nil?
       erb :"agency/#{agency}/success", layout: false
     else
@@ -121,12 +124,18 @@ class RelyingParty < Sinatra::Base
     puts "Got SAMLResponse from NAMEID: #{user_uuid}"
 
     if response.is_valid?
-      session[:userid] = user_uuid
-      session[:email] = response.attributes['email']
-      session[:attributes] = response.attributes.to_h.to_json
+      if session.delete(:step_up_enabled)
+        aal = session.delete(:step_up_aal)
 
-      puts 'SAML Success!'
-      redirect to('/success')
+        redirect to("/login_get/?aal=#{aal}&ial=2")
+      else
+        session[:userid] = user_uuid
+        session[:email] = response.attributes['email']
+        session[:attributes] = response.attributes.to_h.to_json
+
+        puts 'SAML Success!'
+        redirect to('/success')
+      end
     else
       puts 'SAML Fail :('
       @errors = response.errors
@@ -140,6 +149,8 @@ class RelyingParty < Sinatra::Base
     session.delete(:userid)
     session.delete(:email)
     session.delete(:attributes)
+    session.delete(:step_up_enabled)
+    session.delete(:step_up_aal)
   end
 
   def home_page
@@ -192,7 +203,7 @@ class RelyingParty < Sinatra::Base
     return @saml_sp_certificate if defined?(@saml_sp_certificate)
 
     if running_in_prod_env? && !ENV['sp_cert']
-      raise NotImplementedError.new('Refusing to use demo cert in production')
+      raise NotImplementedError, 'Refusing to use demo cert in production'
     end
 
     @saml_sp_certificate = ENV['sp_cert'] || File.read('config/demo_sp.crt')
@@ -202,7 +213,7 @@ class RelyingParty < Sinatra::Base
     return @saml_sp_private_key if defined?(@saml_sp_private_key)
 
     if running_in_prod_env? && !ENV['sp_private_key']
-      raise NotImplementedError.new('Refusing to use demo private key in production')
+      raise NotImplementedError, 'Refusing to use demo private key in production'
     end
 
     @saml_sp_private_key = ENV['sp_private_key'] || File.read('config/demo_sp.key')
@@ -266,6 +277,19 @@ class RelyingParty < Sinatra::Base
     settings.name_identifier_value = session[:user_id]
     logout_request = OneLogin::RubySaml::Logoutrequest.new.create(settings)
     redirect to(logout_request)
+  end
+
+  def prepare_step_up_flow(session:, ial:, aal: nil)
+    if ial == 'step-up'
+      ial = '1'
+      session[:step_up_enabled] = 'true'
+      session[:step_up_aal] = aal if %r{^\d$}.match?(aal)
+    else
+      session.delete(:step_up_enabled)
+      session.delete(:step_up_aal)
+    end
+
+    ial
   end
 
   def maybe_redact_ssn(ssn)
