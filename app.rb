@@ -281,7 +281,6 @@ class RelyingParty < Sinatra::Base
 
   def prepare_step_up_flow(session:, ial:, aal: nil)
     if ial == 'step-up'
-      puts "\n    ~~~~~~~ prepare_step_up_flow"
       ial = '1'
       session[:step_up_enabled] = 'true'
       session[:step_up_aal] = aal if %r{^\d$}.match?(aal)
