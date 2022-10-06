@@ -35,7 +35,7 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+      ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
       aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
       ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
       skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -61,7 +61,7 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via GET'
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+    ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
     aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
     skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -74,7 +74,7 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via POST'
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
-    ial = get_param(:ial, %w[sp 1 2 2-strict 0 step-up]) || '1'
+    ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
     aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
     skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -170,8 +170,6 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/ial/1'
     when '2'
       'http://idmanagement.gov/ns/assurance/ial/2'
-    when '2-strict'
-      'http://idmanagement.gov/ns/assurance/ial/2?strict=true'
     when '0'
       'http://idmanagement.gov/ns/assurance/ial/0'
     else
