@@ -79,7 +79,7 @@ DEPENDENCIES
   rack-test (>= 2.0.0)
   rake
   ruby-saml (>= 1.9.0)
-  sinatra
+  sinatra (>= 3.0.4)
   test-unit
 
 RUBY VERSION
