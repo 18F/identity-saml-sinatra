@@ -75,7 +75,7 @@
           </div>
         <% else %>
           <div class="sign-in-wrap">
-            <form action="<%= login_path %>" method="GET" style="float:right">
+            <form action="<%= login_path %>" method="GET" style="float:right" id="login-form">
               <div class="sign-in-wrap clearfix">
                 <button type="submit"  class="usa-button usa-button--outline sign-in-bttn">
                   <svg role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
@@ -136,6 +136,38 @@
                     ].each do |value, label| %>
                       <option value="<%= value %>"
                               <%= 'selected="true"' if skip_encryption == value %>
+                              >
+                        <%= label %>
+                      </option>
+                    <% end %>
+                  </select>
+
+                  <label class="usa-label" for="force_authn">
+                    ForceAuthn
+                  </label>
+                  <select name="force_authn" id="force_authn" class="usa-select">
+                    <% [
+                      [nil, 'false'],
+                      ['true', 'true']
+                    ].each do |value, label| %>
+                      <option value="<%= value %>"
+                              <%= 'selected="true"' if force_authn == value %>
+                              >
+                        <%= label %>
+                      </option>
+                    <% end %>
+                  </select>
+
+                  <label class="usa-label" for="login_method">
+                    HTTP Method
+                  </label>
+                  <select name="login_method" id="login_method" class="usa-select">
+                    <% [
+                      ['get', 'GET'],
+                      ['post', 'POST']
+                    ].each do |value, label| %>
+                      <option value="<%= value %>"
+                              <%= 'selected="true"' if method == value %>
                               >
                         <%= label %>
                       </option>
@@ -304,3 +336,18 @@
     </div>
   </div>
 </footer>
+<script>
+  document.getElementById("login_method").addEventListener("change", (e) => {
+    const method = e.target.value;
+    const login_form = document.getElementById("login-form");
+    const current_action = login_form.getAttribute("action");
+
+    if (method == "get") {
+      new_action = current_action.replace("login_post", "login_get")
+      login_form.setAttribute("action", new_action);
+    } else if (method == "post") {
+      new_action = current_action.replace("login_get", "login_post")
+      login_form.setAttribute("action", new_action);
+    }
+  });
+</script>

@@ -38,6 +38,7 @@ class RelyingParty < Sinatra::Base
       ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
       aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
       ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+      force_authn = get_param(:force_authn, %w[true false])
       skip_encryption = get_param(:skip_encryption, %w[true false])
 
       login_path = '/login_get?' + {
@@ -49,10 +50,12 @@ class RelyingParty < Sinatra::Base
       erb :index, locals: {
         ial: ial,
         aal: aal,
+        force_authn: force_authn,
         skip_encryption: skip_encryption,
         logout_msg: logout_msg,
         login_msg: login_msg,
         login_path: login_path,
+        method: 'get',
       }
     end
   end
@@ -64,22 +67,29 @@ class RelyingParty < Sinatra::Base
     ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
     aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
-    request_url = request.create(saml_settings(ial: ial, aal: aal))
+    request_url = request.create(saml_settings(ial: ial, aal: aal, force_authn: force_authn))
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
   end
 
-  post '/login_post/?' do
+  get '/login_post/?' do
     puts 'Logging in via POST'
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
     ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
     aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
     settings = saml_settings(ial: ial, aal: aal)
-    post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
+    post_params = saml_request.create_params(
+      settings,
+      force_authn: force_authn,
+      skip_encryption: skip_encryption,
+      'RelayState' => params[:id],
+    )
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url: login_url, post_params: post_params }
   end
@@ -161,7 +171,7 @@ class RelyingParty < Sinatra::Base
     end
   end
 
-  def saml_settings(ial: nil, aal: nil)
+  def saml_settings(ial: nil, aal: nil, force_authn: false)
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
@@ -190,6 +200,7 @@ class RelyingParty < Sinatra::Base
     base_config.ial_context = ial_context if ial_context
     base_config.aal_context = aal_context if aal_context
     base_config.authn_context = [base_config.ial_context, base_config.aal_context].compact
+    base_config.force_authn = force_authn
 
     base_config.certificate = saml_sp_certificate
     base_config.private_key = saml_sp_private_key
