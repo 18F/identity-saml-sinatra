@@ -15,5 +15,6 @@ gem 'test-unit'
 gem 'activesupport'
 
 group :development do
+  gem 'puma'
   gem 'pry'
 end
