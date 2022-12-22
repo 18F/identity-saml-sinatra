@@ -2,7 +2,7 @@ HOST ?= localhost
 PORT ?= 4567
 
 .env: .env.example
-	cp -n .env.example .env
+	cp -n .env.example .env || true
 
 setup: .env
 	bundle install
