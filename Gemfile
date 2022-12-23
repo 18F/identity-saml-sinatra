@@ -14,8 +14,8 @@ gem 'rake'
 gem 'sinatra', '>= 3.0.4'
 gem 'test-unit'
 gem 'activesupport'
+gem 'puma'
 
 group :development do
-  gem 'puma'
   gem 'pry'
 end
