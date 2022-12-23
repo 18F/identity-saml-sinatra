@@ -76,7 +76,7 @@ jobs:
       - run:
           name: deploy to cloud.gov
           command: |
-            cf push << parameters.space >>-identity-saml-sinatra
+            cf push << parameters.space >>-identity-saml-sinatra -b ruby_buildpack
 
       - save_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
