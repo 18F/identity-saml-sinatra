@@ -36,7 +36,7 @@ class RelyingParty < Sinatra::Base
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
       ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
-      aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+      aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
       ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
       force_authn = get_param(:force_authn, %w[true false])
       skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -65,7 +65,7 @@ class RelyingParty < Sinatra::Base
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
     ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
-    aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+    aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -79,7 +79,7 @@ class RelyingParty < Sinatra::Base
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
     ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
-    aal = get_param(:aal, %w[sp 1 2 3 3-hspd12]) || '2'
+    aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
@@ -184,10 +184,10 @@ class RelyingParty < Sinatra::Base
     aal_context = case aal
     when '2'
       'http://idmanagement.gov/ns/assurance/aal/2'
-    when '3'
-      'http://idmanagement.gov/ns/assurance/aal/3'
-    when '3-hspd12'
-      'http://idmanagement.gov/ns/assurance/aal/3?hspd12=true'
+    when '2-phishing_resistant'
+      'http://idmanagement.gov/ns/assurance/aal/2?phishing_resistant=true'
+    when '2-hspd12'
+      'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true'
     else
       nil
     end
