@@ -185,9 +185,9 @@ class RelyingParty < Sinatra::Base
     when '2'
       'http://idmanagement.gov/ns/assurance/aal/2'
     when '3'
-      'http://idmanagement.gov/ns/assurance/aal/3'
+      'http://idmanagement.gov/ns/assurance/aal/2?phishing_resistant=true'
     when '3-hspd12'
-      'http://idmanagement.gov/ns/assurance/aal/3?hspd12=true'
+      'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true'
     else
       nil
     end
