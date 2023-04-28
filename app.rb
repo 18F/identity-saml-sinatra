@@ -148,6 +148,11 @@ class RelyingParty < Sinatra::Base
     end
   end
 
+  get '/failure_to_proof' do
+    puts 'Failure to Proof :('
+    erb :failure_to_proof
+  end
+
   private
 
   def logout_session
