@@ -150,7 +150,7 @@ class RelyingParty < Sinatra::Base
 
   get '/failure_to_proof' do
     puts 'Failure to Proof :('
-    erb :failure_to_proof#, layout: true
+    erb :failure_to_proof
   end
 
   private
