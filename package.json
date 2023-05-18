@@ -1,0 +1,9 @@
+{
+  "name": "identity-saml-sinatra",
+  "version": "1.0.0",
+  "private": true,
+  "license": "CC0-1.0",
+  "dependencies": {
+    "uswds": "^2.13.3"
+  }
+}
