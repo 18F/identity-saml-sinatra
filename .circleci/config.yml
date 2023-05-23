@@ -89,6 +89,8 @@ jobs:
 
       - install-dependencies
 
+      - build-release
+
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
 
