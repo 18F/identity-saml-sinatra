@@ -5,6 +5,13 @@
 #
 version: 2.1
 
+executors:
+  ruby_browsers:
+    docker:
+      - image: cimg/ruby:3.0.5
+        environment:
+          BUNDLER_VERSION: 2.3.13
+
 commands:
   bundle-yarn-install:
     steps:
