@@ -5,12 +5,19 @@
 #
 version: 2.1
 
+executors:
+  ruby_browsers:
+    docker:
+      - image: cimg/ruby:3.0.4-browsers
+        environment:
+          BUNDLER_VERSION: 2.3.13
+
 commands:
   bundle-yarn-install:
     steps:
       - restore_cache:
           key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
-      - run: gem install bundler --version 2.3.13
+      - run: gem install bundler --version $BUNDLER_VERSION
       - run:
           name: Install dependencies
           command: |
@@ -89,6 +96,8 @@ jobs:
         type: string
     steps:
       - checkout
+      
+      - bundle-yarn-install
 
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
