@@ -20,8 +20,8 @@ commands:
       - run:
           name: Install dependencies
           command: |
-            bundle check || bundle install --deployment --jobs=4 --retry=3 \
-              --without deploy development doc production --path vendor/bundle
+            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+            bundle exec rake login:deploy_json
       - save_cache:
           key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
           paths:
@@ -59,13 +59,6 @@ jobs:
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
 
-      - run:
-          name: Install dependencies
-          command: |
-            gem install bundler
-            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-            bundle exec rake login:deploy_json
-
       # Store bundle cache
       - save_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
@@ -98,13 +91,6 @@ jobs:
 
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-
-      - run:
-          name: Install dependencies
-          command: |
-            gem install bundler
-            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-            bundle exec rake login:deploy_json
 
       - run:
           name: Install cf cli
