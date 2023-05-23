@@ -3,25 +3,61 @@
 # Check https://circleci.com/docs/2.0/language-ruby/ for more details
 #
 version: 2.1
+
+executors:
+  ruby_browsers:
+    docker:
+      - image: cimg/ruby:3.0.4-browsers
+        environment:
+          BUNDLER_VERSION: 2.3.13
+
+commands:
+  install-dependencies:
+    steps:
+      - restore_cache:
+          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
+      - run: gem install bundler --version $BUNDLER_VERSION
+      - run:
+          name: Install dependencies
+          command: |
+            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+            bundle exec rake login:deploy_json
+      - save_cache:
+          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+      - restore_cache:
+          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
+      - run:
+          name: Install Yarn
+          command: yarn install --cache-folder ~/.cache/yarn
+      - save_cache:
+          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.cache/yarn
+  build-release:
+    steps:
+      - run:
+          name: Create deploy.json
+          command: bundle exec rake login:deploy_json
+      - run:
+          name: Copy vendor dependencies
+          command: make copy_vendor
+
 jobs:
   build:
-    docker:
-      # Specify the Ruby version you desire here
-      - image: cimg/ruby:3.0.5
+    executor: ruby_browsers
 
     working_directory: ~/identity-saml-sinatra
     steps:
       - checkout
 
+      - install-dependencies
+
+      - build-release
+
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-
-      - run:
-          name: Install dependencies
-          command: |
-            gem install bundler
-            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-            bundle exec rake login:deploy_json
 
       # Store bundle cache
       - save_cache:
@@ -42,8 +78,8 @@ jobs:
           destination: test-results
 
   deploy:
-    docker:
-      - image: cimg/ruby:3.0.5
+    executor: ruby_browsers
+
     working_directory: ~/identity-saml-sinatra
     parameters:
       space:
@@ -51,15 +87,10 @@ jobs:
     steps:
       - checkout
 
+      - install-dependencies
+
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-
-      - run:
-          name: Install dependencies
-          command: |
-            gem install bundler
-            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-            bundle exec rake login:deploy_json
 
       - run:
           name: Install cf cli
