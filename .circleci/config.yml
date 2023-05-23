@@ -12,7 +12,7 @@ executors:
           BUNDLER_VERSION: 2.3.13
 
 commands:
-  bundle-yarn-install:
+  install-dependencies:
     steps:
       - restore_cache:
           key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
@@ -52,7 +52,7 @@ jobs:
     steps:
       - checkout
 
-      - bundle-yarn-install
+      - install-dependencies
 
       - build-release
 
@@ -87,7 +87,7 @@ jobs:
     steps:
       - checkout
 
-      - bundle-yarn-install
+      - install-dependencies
 
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
