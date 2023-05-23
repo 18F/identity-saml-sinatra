@@ -1,8 +1,43 @@
+###SAML
 # Ruby CircleCI 2.0 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-ruby/ for more details
 #
 version: 2.1
+
+commands:
+  bundle-yarn-install:
+    steps:
+      - restore_cache:
+          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
+      - run: gem install bundler --version $BUNDLER_VERSION
+      - run:
+          name: Install dependencies
+          command: |
+            bundle check || bundle install --deployment --jobs=4 --retry=3 \
+              --without deploy development doc production --path vendor/bundle
+      - save_cache:
+          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+      - restore_cache:
+          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
+      - run:
+          name: Install Yarn
+          command: yarn install --cache-folder ~/.cache/yarn
+      - save_cache:
+          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
+          paths:
+            - ~/.cache/yarn
+  build-release:
+    steps:
+      - run:
+          name: Create deploy.json
+          command: bundle exec rake login:deploy_json
+      - run:
+          name: Copy vendor dependencies
+          command: make copy_vendor
+
 jobs:
   build:
     docker:
@@ -12,6 +47,10 @@ jobs:
     working_directory: ~/identity-saml-sinatra
     steps:
       - checkout
+
+      - bundle-yarn-install
+
+      - build-release
 
       - restore_cache:
           key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
