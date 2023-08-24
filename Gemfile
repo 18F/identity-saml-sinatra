@@ -13,7 +13,7 @@ gem 'rack-test', '>= 2.0.0'
 gem 'rake'
 gem 'sinatra', '>= 3.0.4'
 gem 'test-unit'
-gem 'activesupport'
+gem 'activesupport', '>= 6.1.7.5'
 gem 'puma'
 
 group :development do
