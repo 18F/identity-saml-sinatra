@@ -22,6 +22,7 @@ GEM
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.0)
     aws-sigv4 (1.0.3)
+    base64 (0.2.0)
     coderay (1.1.2)
     concurrent-ruby (1.2.2)
     dotenv (2.7.5)
@@ -48,10 +49,13 @@ GEM
     puma (6.4.2)
       nio4r (~> 2.0)
     racc (1.7.3)
-    rack (2.2.6.4)
-    rack-protection (3.0.4)
-      rack
-    rack-test (2.0.2)
+    rack (3.0.9.1)
+    rack-protection (4.0.0)
+      base64 (>= 0.1.0)
+      rack (>= 3.0.0, < 4)
+    rack-session (2.0.0)
+      rack (>= 3.0.0)
+    rack-test (2.1.0)
       rack (>= 1.3)
     rake (13.0.1)
     rexml (3.2.5)
@@ -59,14 +63,15 @@ GEM
       nokogiri (>= 1.10.5)
       rexml
     ruby2_keywords (0.0.5)
-    sinatra (3.0.4)
+    sinatra (4.0.0)
       mustermann (~> 3.0)
-      rack (~> 2.2, >= 2.2.4)
-      rack-protection (= 3.0.4)
+      rack (>= 3.0.0, < 4)
+      rack-protection (= 4.0.0)
+      rack-session (>= 2.0.0, < 3)
       tilt (~> 2.0)
     test-unit (3.5.7)
       power_assert
-    tilt (2.0.11)
+    tilt (2.3.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     zeitwerk (2.6.11)
@@ -82,15 +87,15 @@ DEPENDENCIES
   mocha
   pry
   puma
-  rack-test (>= 2.0.0)
+  rack-test (>= 2.1.0)
   rake
   rexml
   ruby-saml (>= 1.9.0)
-  sinatra (>= 3.0.4)
+  sinatra (>= 3.0.5)
   test-unit
 
 RUBY VERSION
    ruby 3.1.4p223
 
 BUNDLED WITH
-   2.2.33
+   2.3.26
