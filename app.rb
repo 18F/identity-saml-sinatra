@@ -64,7 +64,7 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via GET'
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
+    ial = get_param(:ial, %w[sp 1 2 0 biometric-comparison-required step-up]) || '1'
     aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
     ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
     force_authn = get_param(:force_authn, %w[true false])
@@ -175,7 +175,26 @@ class RelyingParty < Sinatra::Base
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
-    ial_context = case ial
+    base_config.ial_context = ial_authn_context(ial)
+    base_config.aal_context = aal_authn_context(aal)
+    base_config.vtr_context = vtr_authn_context(ial:, aal:)
+    base_config.authn_context = [
+      base_config.ial_context,
+      base_config.aal_context,
+      base_config.vtr_context,
+    ].compact
+    base_config.force_authn = force_authn
+
+    base_config.certificate = saml_sp_certificate
+    base_config.private_key = saml_sp_private_key
+
+    OneLogin::RubySaml::Settings.new(base_config)
+  end
+
+  def ial_authn_context(ial)
+    return nil if vtr_enabled?
+
+    case ial
     when '1'
       'http://idmanagement.gov/ns/assurance/ial/1'
     when '2'
@@ -185,8 +204,12 @@ class RelyingParty < Sinatra::Base
     else
       nil
     end
+  end
 
-    aal_context = case aal
+  def aal_authn_context(aal)
+    return nil if vtr_enabled?
+
+    case aal
     when '2'
       'http://idmanagement.gov/ns/assurance/aal/2'
     when '2-phishing_resistant'
@@ -196,16 +219,25 @@ class RelyingParty < Sinatra::Base
     else
       nil
     end
+  end
 
-    base_config.ial_context = ial_context if ial_context
-    base_config.aal_context = aal_context if aal_context
-    base_config.authn_context = [base_config.ial_context, base_config.aal_context].compact
-    base_config.force_authn = force_authn
+  def vtr_authn_context(ial:, aal:)
+    return nil unless vtr_enabled?
 
-    base_config.certificate = saml_sp_certificate
-    base_config.private_key = saml_sp_private_key
+      values = ['C1']
 
-    OneLogin::RubySaml::Settings.new(base_config)
+      values << {
+        '2' => 'C2',
+        '2-phishing_resistant' => 'C2.Ca',
+        '2-hspd12' => 'C2.Cb',
+      }[aal]
+
+      values << {
+        '2' => 'P1',
+        'biometric-comparison-required' => 'P1.Pb',
+      }[ial]
+
+      values.compact.join('.')
   end
 
   def saml_sp_certificate
@@ -303,6 +335,10 @@ class RelyingParty < Sinatra::Base
 
   def maybe_redact_ssn(ssn)
     ssn&.gsub(/\d/, '#')
+  end
+
+  def vtr_enabled?
+    ENV['vtr_enabled'] == 'true'
   end
 
   run! if app_file == $0

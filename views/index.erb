@@ -116,8 +116,11 @@
                       ['1', 'Authentication only (default)'],
                       ['2', 'Identity-verified'],
                       ['0', 'IALMax'],
+                      if ENV['vtr_enabled'] == 'true'
+                        ['biometric-comparison-required', 'Biometric Comparison']
+                      end,
                       ['step-up', 'Step-up Flow'],
-                    ].each do |value, label| %>
+                    ].compact.each do |value, label| %>
                       <option value="<%= value %>"
                               <%= 'selected="true"' if ial == value %>
                               >
