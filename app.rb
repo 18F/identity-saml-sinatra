@@ -193,7 +193,7 @@ class RelyingParty < Sinatra::Base
   end
 
   def ial_authn_context(ial)
-    return nil if vtr_enabled?
+    return nil unless vtr_disabled?
 
     case ial
     when '1'
@@ -208,7 +208,7 @@ class RelyingParty < Sinatra::Base
   end
 
   def aal_authn_context(aal)
-    return nil if vtr_enabled?
+    return nil unless vtr_disabled?
 
     case aal
     when '2'
@@ -223,7 +223,7 @@ class RelyingParty < Sinatra::Base
   end
 
   def vtr_authn_context(ial:, aal:)
-    return nil unless vtr_enabled?
+    return nil if vtr_disabled?
 
       values = ['C1']
 
@@ -338,8 +338,8 @@ class RelyingParty < Sinatra::Base
     ssn&.gsub(/\d/, '#')
   end
 
-  def vtr_enabled?
-    ENV['vtr_enabled'] == 'true'
+  def vtr_disabled?
+    ENV['vtr_disabled'] == 'true'
   end
 
   run! if app_file == $0

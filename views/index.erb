@@ -116,7 +116,7 @@
                       ['1', 'Authentication only (default)'],
                       ['2', 'Identity-verified'],
                       ['0', 'IALMax'],
-                      if ENV['vtr_enabled'] == 'true'
+                      if ENV['vtr_disabled'] != 'true'
                         ['biometric-comparison-required', 'Biometric Comparison']
                       end,
                       ['step-up', 'Step-up Flow'],
