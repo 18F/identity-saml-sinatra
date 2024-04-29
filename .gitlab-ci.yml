@@ -3,7 +3,7 @@
 # Check [GITLAB SITE] for more details
 #
 default:
-  image: ruby:2.7.3
+  image: ruby:2.2.2
 
 .bundle_install: &bundle_install
   - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
