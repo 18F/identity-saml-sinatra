@@ -1,136 +1,76 @@
-# Ruby CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-ruby/ for more details
-#
-version: 2.1
 
-executors:
-  ruby_browsers:
-    docker:
-      - image: cimg/ruby:3.1.4-browsers
-        environment:
-          BUNDLER_VERSION: 2.3.13
 
-commands:
-  install-dependencies:
-    steps:
-      - restore_cache:
-          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
-      - run: gem install bundler --version $BUNDLER_VERSION
-      - run:
-          name: Install dependencies
-          command: |
-            bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-            bundle exec rake login:deploy_json
-      - save_cache:
-          key: identity-saml-bundle-{{ checksum "Gemfile.lock" }}
-          paths:
-            - vendor/bundle
-      - restore_cache:
-          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
-      - run:
-          name: Install Yarn
-          command: yarn install --cache-folder ~/.cache/yarn
-      - save_cache:
-          key: identity-saml-yarn-{{ checksum "yarn.lock" }}
-          paths:
-            - ~/.cache/yarn
-  build-release:
-    steps:
-      - run:
-          name: Create deploy.json
-          command: bundle exec rake login:deploy_json
-      - run:
-          name: Copy vendor dependencies
-          command: make copy_vendor
+.merge_request:
+  rules:    
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
 
-jobs:
-  build:
-    executor: ruby_browsers
 
-    working_directory: ~/identity-saml-sinatra
-    steps:
-      - checkout
+terraform-fmt:
+  image:
+    name: hashicorp/terraform
+    entrypoint: [""]
+  script:
+    - terraform fmt -recursive -diff -check .
+  rules:
+    - !reference [.merge_request, rules]
+  
 
-      - install-dependencies
+# Scanning top level modules to avoid extreme duplication
+tfsec-check-soft:
+  image: aquasec/tfsec-ci:v1.26.3
+  script:
+    - tfsec --no-color --soft-fail .
+  rules:
+    - !reference [.merge_request, rules]
+  
+# Add folders that should be vuln free and STAY THAT WAY
+tfsec-check-enforce:
+  image: aquasec/tfsec-ci:v1.26.3
+  script:
+    - tfsec --no-color .
+  rules:
+    - !reference [.merge_request, rules]
 
-      - build-release
 
-      - restore_cache:
-          key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
+include: 
+ - template: Jobs/SAST-IaC.gitlab-ci.yml  
+ - template: Security/Secret-Detection.gitlab-ci.yml 
+ - template: Security/SAST.gitlab-ci.yml
+ - template: Jobs/Dependency-Scanning.gitlab-ci.yml
 
-      # Store bundle cache
-      - save_cache:
-          key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-          paths:
-            - vendor/bundle
-
-      - run:
-          name: Run Tests
-          command: |
-            make test
-
-      # collect reports
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-          destination: test-results
-
-  deploy:
-    executor: ruby_browsers
-
-    working_directory: ~/identity-saml-sinatra
-    parameters:
-      space:
-        type: string
-    steps:
-      - checkout
-
-      - install-dependencies
-
-      - build-release
-
-      - restore_cache:
-          key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-
-      - run:
-          name: Install cf cli
-          command: |
-            curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
-            sudo dpkg -i cf-cli_amd64.deb
-            cf -v
-
-      - run:
-          name: login to cloud.gov
-          command: |
-            cf login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF_PASS -o "gsa-login-prototyping" -s "<< parameters.space >>"
-
-      - run:
-          name: deploy to cloud.gov
-          command: |
-            cf push << parameters.space >>-identity-saml-sinatra -b ruby_buildpack
-
-      - save_cache:
-          key: identity-saml-sinatra-{{ checksum "Gemfile.lock" }}
-          paths:
-            - vendor/bundle
-
-workflows:
-  version: 2
-  build_test_deploy:
-    jobs:
-      - build
-      - deploy:
-          requires:
-            - build
-          filters:
-            branches:
-              only: main
-          matrix:
-            parameters:
-              space:
-                - prod
-                - staging
-                - int
-                - dev
+secret_detection:
+  allow_failure: false
+  variables:
+    SECRET_DETECTION_EXCLUDED_PATHS: 'keys.example,config/artifacts.example,public/acuant/*/opencv.min.js,tmp/0.0.0.0-3000.key'
+    SECRET_DETECTION_REPORT_FILE: 'gl-secret-detection-report.json'
+  rules:
+    - if: $SECRET_DETECTION_DISABLED
+      when: never
+    - if: '$CI_COMMIT_BRANCH || $CI_COMMIT_TAG'
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+      variables:
+        SECRET_DETECTION_LOG_OPTIONS: origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}..HEAD
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "main" && $CI_EXTERNAL_PULL_REQUEST_TARGET_BRANCH_NAME == "main"
+      variables:
+        SECRET_DETECTION_LOG_OPTIONS: origin/${CI_EXTERNAL_PULL_REQUEST_TARGET_BRANCH_NAME}..HEAD
+  before_script:
+    - apk add --no-cache jq
+    - git fetch origin --quiet
+  script:
+    - |
+      if [ -z "$SECRET_DETECTION_LOG_OPTIONS" ]; then
+        /analyzer run
+        if [ -f "$SECRET_DETECTION_REPORT_FILE" ]; then
+          # check if '{ "vulnerabilities": [], ..' is empty in the report file if it exists
+          if [ "$(jq ".vulnerabilities | length" $SECRET_DETECTION_REPORT_FILE)" -gt 0 ]; then
+            echo "Vulnerabilities detected. Please analyze the artifact $SECRET_DETECTION_REPORT_FILE produced by the 'secret-detection' job."
+            exit 80
+          fi
+        else
+          echo "Artifact $SECRET_DETECTION_REPORT_FILE does not exist. The 'secret-detection' job likely didn't create one. Hence, no evaluation can be performed."
+        fi
+      else
+        echo "Skipping because this is not a PR or is not targeting main"
+        exit 0
+      fi
