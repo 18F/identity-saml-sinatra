@@ -48,7 +48,7 @@ deploy:
     - for i in $(seq 1 $retry_count); do
         curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github' && break || sleep 10;
       done
-    - sudo dpkg -i cf-cli_amd64.deb
+    - dpkg -i cf-cli_amd64.deb
     - cf -v
     - *bundle_install
     - bundle exec rake login:deploy_json
