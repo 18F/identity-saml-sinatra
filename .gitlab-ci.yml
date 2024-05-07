@@ -45,7 +45,7 @@ deploy:
   image: ruby:3.1.4
   script:
     - curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
-    - sudo dpkg -i cf-cli_amd64.deb
+    - dpkg -i cf-cli_amd64.deb
     - cf -v
     - *bundle_install
     - bundle exec rake login:deploy_json
