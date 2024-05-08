@@ -53,7 +53,7 @@ deploy:
     - cf push $SPACE-identity-saml-sinatra
   parallel:
     matrix:
-      - SPACE: [dev]
+      - SPACE: [prod, staging, int, dev]
 
 
 # Sync from GitHub
