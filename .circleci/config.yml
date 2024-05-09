@@ -9,7 +9,7 @@ executors:
     docker:
       - image: cimg/ruby:3.1.4-browsers
         environment:
-          BUNDLER_VERSION: 2.3.13
+          BUNDLER_VERSION: 3.1.4
 
 commands:
   install-dependencies:
