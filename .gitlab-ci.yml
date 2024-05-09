@@ -1,63 +1,72 @@
-# Ruby GitLab configuration file
-#
-# Check [GITLAB SITE] for more details
-#
-default:
-  image: ruby:3.1.4
+# Ruby GitLab CI configuration file
 
-.bundle_install: &bundle_install
-  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
-
-cache:
-  key:
-    files:
-      - Gemfile.lock
-  paths:
-    - vendor/ruby
-
-before_script:
-  - bundle config set path 'vendor/ruby'
+variables:
+  BUNDLER_VERSION: "2.3.13"
 
 stages:
-  - build
   - test
   - deploy
 
-build:
-  stage: build
-  image: ruby:3.1.4
+install_dependencies:
+  stage: test
+  image: cimg/ruby:3.1.4-browsers
   script:
-    - *bundle_install
+    - gem install bundler --version $BUNDLER_VERSION
+    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
     - bundle exec rake login:deploy_json
+    - yarn install --cache-folder ~/.cache/yarn
+  cache:
+    key:
+      files:
+        - Gemfile.lock
+        - yarn.lock
+    paths:
+      - vendor/bundle
+      - ~/.cache/yarn
+
+build_release:
+  stage: test
+  script:
+    - bundle exec rake login:deploy_json
+    - make copy_vendor
 
 test:
   stage: test
-  image: ruby:3.1.4
+  image: cimg/ruby:3.1.4-browsers
   script:
-    - *bundle_install
     - make test
   artifacts:
     paths:
       - /tmp/test-results
+    reports:
+      junit: /tmp/test-results
 
-deploy:
+deploy_to_cloudgov:
   stage: deploy
-  image: ruby:3.1.4
+  image: cimg/ruby:3.1.4-browsers
   script:
     - curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
-    - dpkg -i cf-cli_amd64.deb
+    - sudo dpkg -i cf-cli_amd64.deb
     - cf -v
-    - *bundle_install
-    - bundle exec rake login:deploy_json
-    - cf login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $TEST_CF_PASS -o "gsa-login-prototyping" -s "$SPACE"
-    - cf push $SPACE-identity-saml-sinatra
-  parallel:
-    matrix:
-      - SPACE: [dev]
+    - cf login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF_PASS -o "gsa-login-prototyping" -s "$SPACE"
+    - cf push $SPACE-identity-saml-sinatra -b ruby_buildpack
+  cache:
+    key: identity-saml-sinatra-$CI_COMMIT_REF_SLUG
+    paths:
+      - vendor/bundle
 
+test_and_deploy:
+  stage: test
+  script: echo "This job is for testing and deploying"
+  only:
+    refs:
+      - move-identity-saml-sinatra-from-GH-toGL
 
-# Sync from GitHub
-include:
-  project: 'lg/identity-gitlab'
-  ref: 'move-identity-saml-sinatra-from-GH-toGL'
-  file: '.gitlab-ci-sync.yml'
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "move-identity-saml-sinatra-from-GH-toGL"'
+      when: always
+    - if: '$CI_COMMIT_BRANCH != "move-identity-saml-sinatra-from-GH-toGL"'
+      when: never
+  include:
+    - template: 'Workflows/Branch-Pipeline.gitlab-ci.yml'
