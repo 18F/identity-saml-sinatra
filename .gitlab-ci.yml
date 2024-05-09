@@ -3,6 +3,9 @@
 variables:
   BUNDLER_VERSION: "2.3.13"
 
+default:
+  image: cimg/ruby:3.1.4-browsers
+
 stages:
   - test
   - deploy
@@ -25,8 +28,10 @@ install_dependencies:
       - ~/.cache/yarn
 
 build_release:
-  stage: test
+  stage: build
+  image: cimg/ruby:3.1.4-browsers
   script:
+    - *bundle_install
     - bundle exec rake login:deploy_json
     - make copy_vendor
 
@@ -34,6 +39,7 @@ test:
   stage: test
   image: cimg/ruby:3.1.4-browsers
   script:
+    - *bundle_install
     - make test
   artifacts:
     paths:
@@ -48,25 +54,16 @@ deploy_to_cloudgov:
     - curl -v -L -o cf-cli_amd64.deb 'https://cli.run.pivotal.io/stable?release=debian64&source=github'
     - sudo dpkg -i cf-cli_amd64.deb
     - cf -v
+    - *bundle_install
+    - bundle exec rake login:deploy_json
     - cf login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF_PASS -o "gsa-login-prototyping" -s "$SPACE"
     - cf push $SPACE-identity-saml-sinatra -b ruby_buildpack
-  cache:
-    key: identity-saml-sinatra-$CI_COMMIT_REF_SLUG
-    paths:
-      - vendor/bundle
+  parallel:
+    matrix:
+      - SPACE: [prod, staging, int, dev]
 
-test_and_deploy:
-  stage: test
-  script: echo "This job is for testing and deploying"
-  only:
-    refs:
-      - move-identity-saml-sinatra-from-GH-toGL
-
-workflow:
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "move-identity-saml-sinatra-from-GH-toGL"'
-      when: always
-    - if: '$CI_COMMIT_BRANCH != "move-identity-saml-sinatra-from-GH-toGL"'
-      when: never
-  include:
-    - template: 'Workflows/Branch-Pipeline.gitlab-ci.yml'
+# Sync from GitHub
+include:
+  project: 'lg/identity-gitlab'
+  ref: 'move-identity-saml-sinatra-from-GH-toGL'
+  file: '.gitlab-ci-sync.yml'
