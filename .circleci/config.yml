@@ -126,7 +126,7 @@ workflows:
             - build
           filters:
             branches:
-              only: main
+              only: move-identity-saml-sinatra-from-GH-toGL
           matrix:
             parameters:
               space:
