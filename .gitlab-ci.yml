@@ -3,20 +3,23 @@
 variables:
   BUNDLER_VERSION: "2.3.13"
 
-default:
-  image: cimg/ruby:3.1.4-browsers
+.bundle_install: &bundle_install
+  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+
+before_script:
+  - bundle config set path 'vendor/ruby'
 
 stages:
+  - .pre
+  - build
   - test
   - deploy
 
 install_dependencies:
-  stage: test
+  stage: .pre
   image: cimg/ruby:3.1.4-browsers
   script:
     - gem install bundler --version $BUNDLER_VERSION
-    - bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
-    - bundle exec rake login:deploy_json
     - yarn install --cache-folder ~/.cache/yarn
   cache:
     key:
@@ -35,7 +38,7 @@ build_release:
     - bundle exec rake login:deploy_json
     - make copy_vendor
 
-test:
+test_release:
   stage: test
   image: cimg/ruby:3.1.4-browsers
   script:
@@ -65,5 +68,5 @@ deploy_to_cloudgov:
 # Sync from GitHub
 include:
   project: 'lg/identity-gitlab'
-  ref: 'move-identity-saml-sinatra-from-GH-toGL'
+  ref: 'main'
   file: '.gitlab-ci-sync.yml'
