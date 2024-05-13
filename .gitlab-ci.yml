@@ -54,7 +54,11 @@ deploy_to_cloudgov:
   script:
     - curl  -v -L -o cf8-cli_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
     - tar -xvzf cf8-cli_linux_x86-64.tgz
-    - sudo mv cf /usr/local/bin
+    - mkdir -p ~/bin
+    - chmod 777 /usr/local/bin
+    - mv cf /usr/local/bin
+    - chmod +x /usr/local/bin/cf
+    - cf --version
     - sudo curl -o /usr/share/bash-completion/completions/cf8 https://raw.githubusercontent.com/cloudfoundry/cli-ci/master/ci/installers/completion/cf8
     - cf version
     - *bundle_install
