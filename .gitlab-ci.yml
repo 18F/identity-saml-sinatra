@@ -52,8 +52,8 @@ deploy_to_cloudgov:
   stage: deploy
   image: cimg/ruby:3.1.4-browsers
   script:
-    - curl  -v -L -o cf8-cli_8.7.10_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
-    - tar -zx cf8-cli_8.7.10_linux_x86-64.tgz
+    - curl  -v -L -o cf8-cli_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
+    - tar -zx cf8-cli_linux_x86-64.tgz
     - mv cf8 /user/local/bin
     - mv cf /usr/local/bin
     - sudo curl -o /usr/share/bash-completion/completions/cf8 https://raw.githubusercontent.com/cloudfoundry/cli-ci/master/ci/installers/completion/cf8
@@ -64,7 +64,7 @@ deploy_to_cloudgov:
     - cf push $SPACE-identity-saml-sinatra -b ruby_buildpack
   parallel:
     matrix:
-      - SPACE: [prod, staging, int, dev]
+      - SPACE: [dev] #prod, staging, int, 
 
 # Sync from GitHub
 include:
