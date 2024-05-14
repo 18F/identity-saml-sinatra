@@ -64,7 +64,7 @@ install_dependencies:
   script:
     - *bundle_install
     - *yarn_install
-    - bundle exec rake assets:precompile
+    - bundle exec rake login:deploy_json
 
 test_release:
   stage: test
