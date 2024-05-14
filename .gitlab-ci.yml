@@ -1,13 +1,50 @@
-# Ruby GitLab CI configuration file
+
+# Jobs defined here use the idp/ci docker image from ECR by default. 
+# Images are built via the identity-devops GitLab pipeline.
 
 variables:
   BUNDLER_VERSION: "2.3.13"
+  ECR_REGISTRY: '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
+  IDP_WORKER_IMAGE_TAG: 'main'
+  IDP_IMAGE_TAG: 'main'
+  PKI_IMAGE_TAG: 'main'
+
+default:
+  image: '${ECR_REGISTRY}/dashboard/ci:latest'
 
 .bundle_install: &bundle_install
-  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
+  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
 
-before_script:
-  - bundle config set path 'vendor/ruby'
+.yarn_install: &yarn_install
+  - yarn install --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
+
+.yarn_production_install: &yarn_production_install
+  - yarn install --production --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
+
+.build_cache:
+  - &ruby_cache
+    key:
+      files:
+        - Gemfile.lock
+    paths:
+      - vendor/ruby
+    policy: pull
+
+  - &yarn_cache
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull
+
+  - &yarn_production_cache
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - .yarn-cache/
+    policy: pull
 
 stages:
   - .pre
@@ -17,31 +54,32 @@ stages:
 
 install_dependencies:
   stage: .pre
-  image: cimg/ruby:3.1.4-browsers
-  script:
-    - gem install bundler --version $BUNDLER_VERSION
-    - yarn install --cache-folder ~/.cache/yarn
+  variables:
+    RAILS_ENV: test
+    SKIP_YARN_INSTALL: 'true'
   cache:
-    key:
-      files:
-        - Gemfile.lock
-        - yarn.lock
-    paths:
-      - vendor/bundle
-      - ~/.cache/yarn
-
-build_release:
-  stage: build
-  image: cimg/ruby:3.1.4-browsers
+    - <<: *ruby_cache
+      policy: pull-push
+    - <<: *yarn_cache
+      policy: pull-push
+    - <<: *assets_cache
+      policy: push
   script:
     - *bundle_install
-    - bundle exec rake login:deploy_json
+    - *yarn_install
+    - bundle exec rake assets:precompile
 
 test_release:
   stage: test
-  image: cimg/ruby:3.1.4-browsers
+  needs:
+    - job: install_dependencies
+  cache:
+    - <<: *ruby_cache
+    - <<: *yarn_cache
+    - <<: *assets_cache
   script:
     - *bundle_install
+    - *yarn_install
     - make test
   artifacts:
     paths:
@@ -50,7 +88,7 @@ test_release:
 
 deploy_to_cloudgov:
   stage: deploy
-  image: cimg/ruby:3.1.4-browsers
+  image: '${ECR_REGISTRY}/dashboard/ci:latest'
   script:
     - curl  -v -L -o cf8-cli_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
     - tar -xvzf cf8-cli_linux_x86-64.tgz
@@ -68,118 +106,3 @@ deploy_to_cloudgov:
   parallel:
     matrix:
       - SPACE: [prod, staging, int, dev] 
-
-
-
-
-
-
-
-
-# Jobs defined here use the idp/ci docker image from ECR by default. 
-# Images are built via the identity-devops GitLab pipeline.
-
-# variables:
-#   BUNDLER_VERSION: "2.3.13"
-#   ECR_REGISTRY: '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
-#   IDP_WORKER_IMAGE_TAG: 'main'
-#   IDP_IMAGE_TAG: 'main'
-#   PKI_IMAGE_TAG: 'main'
-
-# default:
-#   image: cimg/ruby:3.1.4-browsers #'${ECR_REGISTRY}/dashboard/ci:latest'
-
-# .bundle_install: &bundle_install
-#   - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
-
-# .yarn_install: &yarn_install
-#   - yarn install --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
-
-# .yarn_production_install: &yarn_production_install
-#   - yarn install --production --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
-
-# .build_cache:
-#   - &ruby_cache
-#     key:
-#       files:
-#         - Gemfile.lock
-#     paths:
-#       - vendor/ruby
-#     policy: pull
-
-#   - &yarn_cache
-#     key:
-#       files:
-#         - yarn.lock
-#     paths:
-#       - .yarn-cache/
-#     policy: pull
-
-#   - &yarn_production_cache
-#     key:
-#       files:
-#         - yarn.lock
-#     paths:
-#       - .yarn-cache/
-#     policy: pull
-
-# stages:
-#   - .pre
-#   - build
-#   - test
-#   - deploy
-
-# install_dependencies:
-#   stage: .pre
-#   variables:
-#     RAILS_ENV: test
-#     SKIP_YARN_INSTALL: 'true'
-#   cache:
-#     - <<: *ruby_cache
-#       policy: pull-push
-#     - <<: *yarn_cache
-#       policy: pull-push
-#     - <<: *assets_cache
-#       policy: push
-#   script:
-#     - *bundle_install
-#     - *yarn_install
-#     - bundle exec rake assets:precompile
-
-# test_release:
-#   stage: test
-#   needs:
-#     - job: install_dependencies
-#   cache:
-#     - <<: *ruby_cache
-#     - <<: *yarn_cache
-#     - <<: *assets_cache
-#   script:
-#     - *bundle_install
-#     - *yarn_install
-#     - make test
-#   artifacts:
-#     paths:
-#       - /tmp/test-results
-
-
-# deploy_to_cloudgov:
-#   stage: deploy
-#   image: cimg/ruby:3.1.4-browsers #'${ECR_REGISTRY}/dashboard/ci:latest'
-#   script:
-#     - curl  -v -L -o cf8-cli_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
-#     - tar -xvzf cf8-cli_linux_x86-64.tgz
-#     - mkdir -p ~/bin
-#     - chmod 777 /usr/local/bin
-#     - mv cf /usr/local/bin
-#     - chmod +x /usr/local/bin/cf
-#     - cf --version
-#     - sudo curl -o /usr/share/bash-completion/completions/cf8 https://raw.githubusercontent.com/cloudfoundry/cli-ci/master/ci/installers/completion/cf8
-#     - cf version
-#     - *bundle_install
-#     - bundle exec rake login:deploy_json
-#     - cf login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF_PASS -o "gsa-login-prototyping" -s "$SPACE"
-#     - cf push $SPACE-identity-saml-sinatra -b ruby_buildpack
-#   parallel:
-#     matrix:
-#       - SPACE: [prod, staging, int, dev] 
