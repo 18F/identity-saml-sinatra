@@ -48,7 +48,6 @@ default:
 
 stages:
   - .pre
-  - build
   - test
   - deploy
 
@@ -62,8 +61,6 @@ install_dependencies:
       policy: pull-push
     - <<: *yarn_cache
       policy: pull-push
-    - <<: *assets_cache
-      policy: push
   script:
     - *bundle_install
     - *yarn_install
@@ -76,7 +73,6 @@ test_release:
   cache:
     - <<: *ruby_cache
     - <<: *yarn_cache
-    - <<: *assets_cache
   script:
     - *bundle_install
     - *yarn_install
