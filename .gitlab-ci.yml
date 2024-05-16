@@ -95,8 +95,7 @@ deploy_to_cloudgov:
     - bundle exec rake login:deploy_json
     #- cf8 login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p ${CF8_PASS} -o "gsa-login-prototyping" -s "$SPACE"
     - |
-      cf8 login <<EOF
-      -a https://api.fr.cloud.gov
+      cf8 login -a https://api.fr.cloud.gov <<EOF
       -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76"
       -p "$CF8_PASS"
       -o "gsa-login-prototyping"
