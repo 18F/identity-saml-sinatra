@@ -84,10 +84,23 @@ test_release:
     paths:
       - /tmp/test-results
 
+before_script:
+  - apt-get update && apt-get install -y jq
+
+get-token:
+  stage: deploy
+  image: curlimages/curl:latest
+  script:
+    - export CF_TOKEN=$(curl -s -X POST -d "grant_type=password&username=$CF_USER&password=$CF_PASS&scope=&client_id=cf" $CF_LOGIN_URL/oauth/token | jq -r '.access_token')
+  artifacts:
+    reports:
+      dotenv: .env
 
 deploy_to_cloudgov:
   stage: deploy
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
+    dependencies:
+    - get-token
   script:
     - curl  -v -L -o cf8-cli_linux_x86-64.tgz "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" 
     - tar -xvzf cf8-cli_linux_x86-64.tgz
