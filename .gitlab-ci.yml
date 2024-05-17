@@ -101,7 +101,7 @@ get-token:
 
 deploy_to_cloudgov:
   stage: deploy
-  image: '${ECR_REGISTRY}/dashboard/ci:latest'
+  image: cloudfoundry/cli:latest
   dependencies:
     - get-token
   script:
