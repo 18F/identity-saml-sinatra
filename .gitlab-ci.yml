@@ -7,6 +7,10 @@ variables:
   IDP_WORKER_IMAGE_TAG: 'main'
   IDP_IMAGE_TAG: 'main'
   PKI_IMAGE_TAG: 'main'
+  CF_API: "https://api.fr.cloud.gov"
+  CF_USER: "e1fdd211-f191-40e8-99c7-4e7164d9ae76"
+  CF_PASS: $CF_PASS
+  CF_ORG: "gsa-login-prototyping"
 
 default:
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
@@ -81,6 +85,17 @@ test_release:
       - /tmp/test-results
 
 
+# Ensure the CF_PASS is securely stored in GitLab CI/CD variables
+
+deploy:
+  stage: deploy
+  image: cloudfoundry/cli:latest
+  script:
+    - echo "Logging into Cloud Foundry"
+    - cf8 api $CF_API
+    - cf8 auth $CF_USER $CF_PASS
+    - cf8 target -o $CF_ORG -s $CF_SPACE
+
 deploy_to_cloudgov:
   stage: deploy
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
@@ -92,7 +107,11 @@ deploy_to_cloudgov:
     - curl -o /usr/share/bash-completion/completions/cf8 https://raw.githubusercontent.com/cloudfoundry/cli-ci/master/ci/installers/completion/cf8
     - *bundle_install
     - bundle exec rake login:deploy_json
-    - CF_TRACE=true cf8 login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF8_PASS -o "gsa-login-prototyping" -s "$SPACE"
+    #- CF_TRACE=true cf8 login -a https://api.fr.cloud.gov -u "e1fdd211-f191-40e8-99c7-4e7164d9ae76" -p $CF8_PASS -o "gsa-login-prototyping" -s "$SPACE"
+    - echo "Logging into Cloud Foundry"
+    - cf8 api $CF_API
+    - cf8 auth $CF_USER $CF_PASS
+    - cf8 target -o $CF_ORG -s $CF_SPACE
     - cf8 push $SPACE-identity-saml-sinatra -b ruby_buildpack
   parallel:
     matrix:
