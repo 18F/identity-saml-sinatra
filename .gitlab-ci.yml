@@ -84,18 +84,6 @@ test_release:
     paths:
       - /tmp/test-results
 
-
-# Ensure the CF_PASS is securely stored in GitLab CI/CD variables
-
-deploy:
-  stage: deploy
-  image: cloudfoundry/cli:latest
-  script:
-    - echo "Logging into Cloud Foundry"
-    - cf8 api $CF_API
-    - cf8 auth $CF_USER $CF_PASS
-    - cf8 target -o $CF_ORG -s $CF_SPACE
-
 deploy_to_cloudgov:
   stage: deploy
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
