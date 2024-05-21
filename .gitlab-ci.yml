@@ -7,10 +7,6 @@ variables:
   IDP_WORKER_IMAGE_TAG: 'main'
   IDP_IMAGE_TAG: 'main'
   PKI_IMAGE_TAG: 'main'
-  CF_API: "https://api.fr.cloud.gov"
-  CF_USER: "e1fdd211-f191-40e8-99c7-4e7164d9ae76"
-  CF_PASS: $CF_PASS
-  CF_ORG: "gsa-login-prototyping"
 
 default:
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
