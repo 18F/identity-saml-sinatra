@@ -26,7 +26,7 @@ default:
       files:
         - Gemfile.lock
     paths:
-      - vendor/ruby
+      - vendor/bundle
     policy: pull
 
   - &yarn_cache
