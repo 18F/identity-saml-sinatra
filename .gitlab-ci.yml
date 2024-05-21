@@ -12,7 +12,7 @@ default:
   image: '${ECR_REGISTRY}/dashboard/ci:latest'
 
 .bundle_install: &bundle_install
-  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
+  - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
 
 .yarn_install: &yarn_install
   - yarn install --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
