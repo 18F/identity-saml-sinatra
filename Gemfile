@@ -1,7 +1,7 @@
 git_source(:github) { |repo_name| "https://github.com/#{repo_name}.git" }
 source 'https://rubygems.org'
 
-ruby '~> 3.2.2'
+ruby '~> 3.1.4'
 
 gem 'aws-sdk-s3', '~> 1.30'
 gem 'dotenv'
