@@ -101,4 +101,5 @@ deploy_to_cloudgov:
     - cf8 push $SPACE-identity-saml-sinatra -b ruby_buildpack
   parallel:
     matrix:
-      - SPACE: [prod, staging, int, dev] 
+      # - SPACE: [prod, staging, int, dev, dm] 
+      - SPACE: [dev]
