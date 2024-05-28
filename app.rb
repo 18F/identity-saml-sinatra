@@ -181,7 +181,7 @@ class RelyingParty < Sinatra::Base
     base_config.authn_context = [
       base_config.ial_context,
       base_config.aal_context,
-      base_config.vtr_context,
+      *base_config.vtr_context,
       'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented',
     ].compact
     base_config.force_authn = force_authn
