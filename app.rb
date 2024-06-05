@@ -181,7 +181,7 @@ class RelyingParty < Sinatra::Base
     base_config.authn_context = [
       base_config.ial_context,
       base_config.aal_context,
-      base_config.vtr_context,
+      *base_config.vtr_context,
       'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented',
     ].compact
     base_config.force_authn = force_authn
@@ -225,20 +225,25 @@ class RelyingParty < Sinatra::Base
   def vtr_authn_context(ial:, aal:)
     return nil if vtr_disabled?
 
-      values = ['C1']
+    values = ['C1']
 
-      values << {
-        '2' => 'C2',
-        '2-phishing_resistant' => 'C2.Ca',
-        '2-hspd12' => 'C2.Cb',
-      }[aal]
+    values << {
+      '2' => 'C2',
+      '2-phishing_resistant' => 'C2.Ca',
+      '2-hspd12' => 'C2.Cb',
+    }[aal]
 
-      values << {
-        '2' => 'P1',
-        'biometric-comparison-required' => 'P1.Pb',
-      }[ial]
+    values << {
+      '2' => 'P1',
+      'biometric-comparison-required' => 'P1.Pb',
+    }[ial]
 
-      values.compact.join('.')
+    vtr_list = [values.compact.join('.')]
+    if ial == '0'
+      proofing_vector = values.dup + ['P1']
+      vtr_list = [proofing_vector.compact.join('.'), *vtr_list]
+    end
+    vtr_list
   end
 
   def saml_sp_certificate
