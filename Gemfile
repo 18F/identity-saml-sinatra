@@ -6,7 +6,6 @@ ruby '~> 3.2.2'
 gem 'aws-sdk-s3', '~> 1.30'
 gem 'dotenv'
 gem 'hashie'
-gem 'mocha'
 gem 'rexml'
 gem 'ruby-saml', '>= 1.9.0'
 gem 'rack-test', '>= 2.0.0'
@@ -18,4 +17,8 @@ gem 'puma'
 
 group :development do
   gem 'pry'
+end
+
+group :development, :test do
+  gem 'rspec'
 end
