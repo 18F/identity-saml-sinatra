@@ -73,6 +73,8 @@ install_dependencies:
 
 test_release:
   stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   needs:
     - job: install_dependencies
   cache:
