@@ -7,7 +7,7 @@ PORT ?= 4567
 setup: .env install_dependencies copy_vendor
 
 test:
-	bundle exec ruby test/app_test.rb
+	bundle exec rspec spec/app_spec.rb
 
 run:
 	bundle exec rackup -p $(PORT) --host ${HOST}
