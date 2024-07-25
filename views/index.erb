@@ -116,7 +116,9 @@
                       ['1', 'Authentication only (default)'],
                       ['2', 'Identity-verified'],
                       ['0', 'IALMax'],
-                      ['biometric-comparison-required', 'Biometric Comparison'],
+                      ['biometric-comparison-vot', 'Biometric Comparison (VOT)'],
+                      ['biometric-comparison-preferred', 'Biometric Comparison Preferred (ACR)'],
+                      ['biometric-comparison-required', 'Biometric Comparison Required (ACR)'],
                       ['step-up', 'Step-up Flow'],
                     ].compact.each do |value, label| %>
                       <option value="<%= value %>"
