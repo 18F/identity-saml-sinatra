@@ -35,11 +35,7 @@ class RelyingParty < Sinatra::Base
       session[:agency] = agency
       erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
     else
-      ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
-      aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
-      ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
-      force_authn = get_param(:force_authn, %w[true false])
-      skip_encryption = get_param(:skip_encryption, %w[true false])
+      ial, aal, force_authn, skip_encryption = extract_params
 
       login_path = '/login_get?' + {
         ial: ial,
@@ -64,12 +60,9 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via GET'
     request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{request}"
-    ial = get_param(:ial, %w[sp 1 2 0 biometric-comparison-required step-up]) || '1'
-    aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
-    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
-    force_authn = get_param(:force_authn, %w[true false])
-    skip_encryption = get_param(:skip_encryption, %w[true false])
-    request_url = request.create(saml_settings(ial: ial, aal: aal, force_authn: force_authn))
+    ial, aal, force_authn, skip_encryption = extract_params
+    sml_set = saml_settings(ial: ial, aal: aal, force_authn: force_authn)
+    request_url = request.create(sml_set)
     request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
     redirect to(request_url)
   end
@@ -78,11 +71,7 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via POST'
     saml_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_request}"
-    ial = get_param(:ial, %w[sp 1 2 0 step-up]) || '1'
-    aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
-    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
-    force_authn = get_param(:force_authn, %w[true false])
-    skip_encryption = get_param(:skip_encryption, %w[true false])
+    ial, aal, force_authn, skip_encryption = extract_params
     settings = saml_settings(ial: ial, aal: aal, force_authn: force_authn)
     post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
@@ -202,6 +191,10 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/ial/2'
     when '0'
       'http://idmanagement.gov/ns/assurance/ial/0'
+    when 'biometric-comparison-preferred'
+      'http://idmanagement.gov/ns/assurance/ial/2?bio=preferred'
+    when 'biometric-comparison-required'
+      'http://idmanagement.gov/ns/assurance/ial/2?bio=required'
     else
       nil
     end
@@ -235,7 +228,7 @@ class RelyingParty < Sinatra::Base
 
     values << {
       '2' => 'P1',
-      'biometric-comparison-required' => 'P1.Pb',
+      'biometric-comparison-vot' => 'P1.Pb',
     }[ial]
 
     vtr_list = [values.compact.join('.')]
@@ -345,6 +338,15 @@ class RelyingParty < Sinatra::Base
 
   def vtr_disabled?
     ENV['vtr_disabled'] == 'true'
+  end
+
+  def extract_params
+    aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
+    ial = get_param(:ial, %w[sp 1 2 0 biometric-comparison-vot biometric-comparison-preferred biometric-comparison-required step-up]) || '1'
+    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    force_authn = get_param(:force_authn, %w[true false])
+    skip_encryption = get_param(:skip_encryption, %w[true false])
+    [ial, aal, force_authn, skip_encryption]
   end
 
   run! if app_file == $0
