@@ -78,7 +78,7 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/1',
            'http://idmanagement.gov/ns/assurance/aal/2',
-           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented']
+           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
 
         it 'sets the correct authn_context' do
@@ -90,7 +90,7 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
            'http://idmanagement.gov/ns/assurance/aal/2',
-           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented']
+           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
         it 'sets the correct authn_context' do
           get '/login_get?ial=biometric-comparison-preferred'
@@ -101,7 +101,7 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
            'http://idmanagement.gov/ns/assurance/aal/2',
-           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented']
+           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
         it 'sets the correct authn_context' do
           get '/login_get?ial=biometric-comparison-required'
@@ -119,7 +119,7 @@ RSpec.describe RelyingParty do
       context 'when the default parameters are used' do
         let(:expected_authn_context) do
           ['C1.C2',
-           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented']
+           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
 
         it 'sets the correct authn_context' do
