@@ -188,7 +188,7 @@ RSpec.describe RelyingParty do
           get '/login_get'
         end
 
-        context 'when new ial values is enabled' do
+        context 'when semantic ial values are enabled' do
           before do
             ENV['semantic_ial_values_enabled'] = 'true'
           end
