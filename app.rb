@@ -165,7 +165,7 @@ class RelyingParty < Sinatra::Base
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
     base_config.ial_context = ial_authn_context(ial)
-    base_config.aal_context = aal_authn_context(aal)
+    base_config.aal_context = aal_authn_context(aal, ial)
     base_config.vtr_context = vtr_authn_context(ial:, aal:)
     base_config.authn_context = [
       base_config.ial_context,
@@ -182,26 +182,17 @@ class RelyingParty < Sinatra::Base
   end
 
   def ial_authn_context(ial)
-    return nil unless vtr_disabled?
+    return nil if vtr_needed?(ial)
 
-    case ial
-    when '1'
-      'http://idmanagement.gov/ns/assurance/ial/1'
-    when '2'
-      'http://idmanagement.gov/ns/assurance/ial/2'
-    when '0'
-      'http://idmanagement.gov/ns/assurance/ial/0'
-    when 'biometric-comparison-preferred'
-      'http://idmanagement.gov/ns/assurance/ial/2?bio=preferred'
-    when 'biometric-comparison-required'
-      'http://idmanagement.gov/ns/assurance/ial/2?bio=required'
+    if new_ial_values_enabled?
+      new_ial_values[ial]
     else
-      nil
+      legacy_ial_values[ial]
     end
   end
 
-  def aal_authn_context(aal)
-    return nil unless vtr_disabled?
+  def aal_authn_context(aal, ial)
+    return nil if vtr_needed?(ial)
 
     case aal
     when '2'
@@ -210,13 +201,11 @@ class RelyingParty < Sinatra::Base
       'http://idmanagement.gov/ns/assurance/aal/2?phishing_resistant=true'
     when '2-hspd12'
       'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true'
-    else
-      nil
     end
   end
 
   def vtr_authn_context(ial:, aal:)
-    return nil if vtr_disabled?
+    return nil unless vtr_needed?(ial)
 
     values = ['C1']
 
@@ -336,8 +325,40 @@ class RelyingParty < Sinatra::Base
     ssn&.gsub(/\d/, '#')
   end
 
+  def vtr_needed?(ial)
+    vtr_enabled? && ial == 'biometric-comparison-vot'
+  end
+
+  def vtr_enabled?
+    !vtr_disabled?
+  end
+
   def vtr_disabled?
     ENV['vtr_disabled'] == 'true'
+  end
+
+  def new_ial_values_enabled?
+    ENV['new_ial_values_enabled'] == 'true'
+  end
+
+  def legacy_ial_values
+    {
+      '0' => 'http://idmanagement.gov/ns/assurance/ial/0',
+      '1' => 'http://idmanagement.gov/ns/assurance/ial/1',
+      '2' => 'http://idmanagement.gov/ns/assurance/ial/2',
+      'biometric-comparison-preferred' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
+      'biometric-comparison-required' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=required',
+    }
+  end
+
+  def new_ial_values
+    {
+      '0' => 'http://idmanagement.gov/ns/assurance/ial/0',
+      '1' => 'urn:acr.login.gov:auth-only',
+      '2' => 'urn:acr.login.gov:verified',
+      'biometric-comparison-required' => 'urn:acr.login.gov:verified-facial-match-required',
+      'biometric-comparison-preferred' => 'urn:acr.login.gov:verified-facial-match-preferred',
+    }
   end
 
   def extract_params

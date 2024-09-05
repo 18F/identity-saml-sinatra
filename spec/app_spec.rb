@@ -20,6 +20,7 @@ RSpec.describe RelyingParty do
     ENV['idp_slo_target_url'] = 'http://localhost:3000/api/saml/logout2024'
     ENV['idp_host'] = 'localhost:3000'
     ENV['idp_cert_fingerprint'] = 'EF:54:67:D4:32:C7:52:E9:8C:25:22:EF:4D:65:4D:08:C9:9A:D8:DC'
+    ENV['new_ial_values_enabled'] = 'false'
   end
 
   context '/' do
@@ -84,6 +85,24 @@ RSpec.describe RelyingParty do
         it 'sets the correct authn_context' do
           get '/login_get'
         end
+
+        context 'when new ial values are enabled' do
+          before do
+            ENV['new_ial_values_enabled'] = 'true'
+          end
+
+          let(:expected_authn_context) do
+            [
+              'urn:acr.login.gov:auth-only',
+              'http://idmanagement.gov/ns/assurance/aal/2',
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+            ]
+          end
+
+          it 'sets the correct authn_context' do
+            get 'login_get'
+          end
+        end
       end
 
       context 'when biometric-comparison-preferred is selected' do
@@ -92,8 +111,27 @@ RSpec.describe RelyingParty do
            'http://idmanagement.gov/ns/assurance/aal/2',
            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
+
         it 'sets the correct authn_context' do
           get '/login_get?ial=biometric-comparison-preferred'
+        end
+
+        context 'when new ial values are enabled' do
+          before do
+            ENV['new_ial_values_enabled'] = 'true'
+          end
+
+          let(:expected_authn_context) do
+            [
+              'urn:acr.login.gov:verified-facial-match-preferred',
+              'http://idmanagement.gov/ns/assurance/aal/2',
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+            ]
+          end
+
+          it 'sets the correct authn_context' do
+            get '/login_get?ial=biometric-comparison-preferred'
+          end
         end
       end
 
@@ -103,8 +141,31 @@ RSpec.describe RelyingParty do
            'http://idmanagement.gov/ns/assurance/aal/2',
            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
+
         it 'sets the correct authn_context' do
           get '/login_get?ial=biometric-comparison-required'
+        end
+
+        context 'when new ial values are enabled' do
+          before do
+            ENV['new_ial_values_enabled'] = 'true'
+          end
+
+          after do
+            ENV['new_ial_values_enabled'] = 'false'
+          end
+
+          let(:expected_authn_context) do
+            [
+              'urn:acr.login.gov:verified-facial-match-required',
+              'http://idmanagement.gov/ns/assurance/aal/2',
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+            ]
+          end
+
+          it 'sets the correct authn_context' do
+            get '/login_get?ial=biometric-comparison-required'
+          end
         end
       end
     end
@@ -118,12 +179,46 @@ RSpec.describe RelyingParty do
 
       context 'when the default parameters are used' do
         let(:expected_authn_context) do
-          ['C1.C2',
-           'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
+          [
+            'http://idmanagement.gov/ns/assurance/ial/1',
+            'http://idmanagement.gov/ns/assurance/aal/2',
+            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+          ]
         end
 
         it 'sets the correct authn_context' do
           get '/login_get'
+        end
+
+        context 'when new ial values is enabled' do
+          before do
+            ENV['new_ial_values_enabled'] = 'true'
+          end
+
+          let(:expected_authn_context) do
+            [
+              'urn:acr.login.gov:auth-only',
+              'http://idmanagement.gov/ns/assurance/aal/2',
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+            ]
+          end
+
+          it 'sets the correct authn_context' do
+            get 'login_get'
+          end
+        end
+      end
+
+      context 'when the biometric comparison is requested' do
+        let(:expected_authn_context) do
+          [
+            'C1.C2.P1.Pb',
+            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+          ]
+        end
+
+        it 'sets the correct authn_context' do
+          get '/login_get/?ial=biometric-comparison-vot'
         end
       end
     end
