@@ -184,8 +184,8 @@ class RelyingParty < Sinatra::Base
   def ial_authn_context(ial)
     return nil if vtr_needed?(ial)
 
-    if new_ial_values_enabled?
-      new_ial_values[ial]
+    if semantic_ial_values_enabled?
+      semantic_ial_values[ial]
     else
       legacy_ial_values[ial]
     end
@@ -337,8 +337,8 @@ class RelyingParty < Sinatra::Base
     ENV['vtr_disabled'] == 'true'
   end
 
-  def new_ial_values_enabled?
-    ENV['new_ial_values_enabled'] == 'true'
+  def semantic_ial_values_enabled?
+    ENV['semantic_ial_values_enabled'] == 'true'
   end
 
   def legacy_ial_values
@@ -351,7 +351,7 @@ class RelyingParty < Sinatra::Base
     }
   end
 
-  def new_ial_values
+  def semantic_ial_values
     {
       '0' => 'http://idmanagement.gov/ns/assurance/ial/0',
       '1' => 'urn:acr.login.gov:auth-only',

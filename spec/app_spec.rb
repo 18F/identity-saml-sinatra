@@ -20,7 +20,7 @@ RSpec.describe RelyingParty do
     ENV['idp_slo_target_url'] = 'http://localhost:3000/api/saml/logout2024'
     ENV['idp_host'] = 'localhost:3000'
     ENV['idp_cert_fingerprint'] = 'EF:54:67:D4:32:C7:52:E9:8C:25:22:EF:4D:65:4D:08:C9:9A:D8:DC'
-    ENV['new_ial_values_enabled'] = 'false'
+    ENV['semantic_ial_values_enabled'] = 'false'
   end
 
   context '/' do
@@ -88,7 +88,7 @@ RSpec.describe RelyingParty do
 
         context 'when new ial values are enabled' do
           before do
-            ENV['new_ial_values_enabled'] = 'true'
+            ENV['semantic_ial_values_enabled'] = 'true'
           end
 
           let(:expected_authn_context) do
@@ -118,7 +118,7 @@ RSpec.describe RelyingParty do
 
         context 'when new ial values are enabled' do
           before do
-            ENV['new_ial_values_enabled'] = 'true'
+            ENV['semantic_ial_values_enabled'] = 'true'
           end
 
           let(:expected_authn_context) do
@@ -148,11 +148,7 @@ RSpec.describe RelyingParty do
 
         context 'when new ial values are enabled' do
           before do
-            ENV['new_ial_values_enabled'] = 'true'
-          end
-
-          after do
-            ENV['new_ial_values_enabled'] = 'false'
+            ENV['semantic_ial_values_enabled'] = 'true'
           end
 
           let(:expected_authn_context) do
@@ -192,7 +188,7 @@ RSpec.describe RelyingParty do
 
         context 'when new ial values is enabled' do
           before do
-            ENV['new_ial_values_enabled'] = 'true'
+            ENV['semantic_ial_values_enabled'] = 'true'
           end
 
           let(:expected_authn_context) do
