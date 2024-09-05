@@ -21,6 +21,8 @@ RSpec.describe RelyingParty do
     ENV['idp_host'] = 'localhost:3000'
     ENV['idp_cert_fingerprint'] = 'EF:54:67:D4:32:C7:52:E9:8C:25:22:EF:4D:65:4D:08:C9:9A:D8:DC'
     ENV['semantic_ial_values_enabled'] = 'false'
+    allow(STDOUT).to receive(:puts)
+    allow(OneLogin::RubySaml::Logging).to receive(:debug)
   end
 
   context '/' do
@@ -86,7 +88,7 @@ RSpec.describe RelyingParty do
           get '/login_get'
         end
 
-        context 'when new ial values are enabled' do
+        context 'when semantic ial values are enabled' do
           before do
             ENV['semantic_ial_values_enabled'] = 'true'
           end
@@ -116,7 +118,7 @@ RSpec.describe RelyingParty do
           get '/login_get?ial=biometric-comparison-preferred'
         end
 
-        context 'when new ial values are enabled' do
+        context 'when semantic ial values are enabled' do
           before do
             ENV['semantic_ial_values_enabled'] = 'true'
           end
@@ -146,7 +148,7 @@ RSpec.describe RelyingParty do
           get '/login_get?ial=biometric-comparison-required'
         end
 
-        context 'when new ial values are enabled' do
+        context 'when semantic ial values are enabled' do
           before do
             ENV['semantic_ial_values_enabled'] = 'true'
           end
