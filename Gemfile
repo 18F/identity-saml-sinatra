@@ -13,7 +13,7 @@ gem 'rake'
 gem 'sinatra', '>= 3.0.4'
 gem 'test-unit'
 gem 'activesupport'
-gem 'puma'
+gem 'puma', '>= 6.4.3'
 
 group :development do
   gem 'pry'
