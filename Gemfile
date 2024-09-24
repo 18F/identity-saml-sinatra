@@ -1,7 +1,7 @@
 git_source(:github) { |repo_name| "https://github.com/#{repo_name}.git" }
 source 'https://rubygems.org'
 
-ruby '~> 3.2.2'
+ruby "~> #{File.read(File.join(__dir__, '.ruby-version')).strip}"
 
 gem 'aws-sdk-s3', '~> 1.30'
 gem 'dotenv'
@@ -17,6 +17,10 @@ gem 'puma'
 
 group :development do
   gem 'pry'
+end
+
+group :test do
+  gem 'simplecov', require: false
 end
 
 group :development, :test do
