@@ -38,24 +38,6 @@ RSpec.describe RelyingParty do
         expect(last_response.body).not_to include('alert(document.domain)')
       end
     end
-
-    context 'when the agency parameter is used with a supported agency' do
-      it "uses the agency's logo" do
-        get '/?agency=uscis'
-
-        expect(last_response.body).to include('img/uscis/logo.png')
-        expect(last_response.body).not_to include('us-flag.png')
-      end
-    end
-
-    context 'when the agency parameter is used with an unsupported agency' do
-      it 'uses the default logo' do
-        get '/?agency=foo'
-
-        expect(last_response.body).not_to include('img/uscis/logo.png')
-        expect(last_response.body).to include('us-flag.png')
-      end
-    end
   end
 
   context '/success' do

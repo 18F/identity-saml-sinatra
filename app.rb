@@ -12,33 +12,25 @@ class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
 
   get '/' do
-    agency = get_param(:agency, %w[uscis sba ed])
-
     logout_msg = session.delete(:logout)
     login_msg = session.delete(:login)
-    if agency
-      session[:agency] = agency
-      erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: }
-    else
-      ial, aal, force_authn, skip_encryption = extract_params
+    ial, aal, force_authn, skip_encryption = extract_params
 
-      login_path = '/login_get?' + {
-        ial:,
-        aal:,
-      }.to_query
+    login_path = '/login_get?' + {
+      ial:,
+      aal:,
+    }.to_query
 
-      session.delete(:agency)
-      erb :index, locals: {
-        ial:,
-        aal:,
-        force_authn:,
-        skip_encryption:,
-        logout_msg:,
-        login_msg:,
-        login_path:,
-        method: 'get',
-      }
-    end
+    erb :index, locals: {
+      ial:,
+      aal:,
+      force_authn:,
+      skip_encryption:,
+      logout_msg:,
+      login_msg:,
+      login_path:,
+      method: 'get',
+    }
   end
 
   get '/login_get/?' do
@@ -83,14 +75,9 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/success/?' do
-    agency = session[:agency]
     puts 'Success!'
-    if !agency.nil?
-      erb :"agency/#{agency}/success", layout: false
-    else
-      session[:login] = 'ok'
-      redirect to('/')
-    end
+    session[:login] = 'ok'
+    redirect to('/')
   end
 
   post '/consume/?' do
@@ -140,14 +127,6 @@ class RelyingParty < Sinatra::Base
     session.delete(:attributes)
     session.delete(:step_up_enabled)
     session.delete(:step_up_aal)
-  end
-
-  def home_page
-    if session[:agency]
-      '/?' + { agency: session[:agency] }.to_query
-    else
-      '/'
-    end
   end
 
   def saml_settings(ial: nil, aal: nil, force_authn: false)
@@ -280,7 +259,7 @@ class RelyingParty < Sinatra::Base
       puts 'Logout failed'
       session[:logout] = 'fail'
     end
-    redirect to(home_page)
+    redirect to('/')
   end
 
   def idp_logout_response
