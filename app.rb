@@ -3,28 +3,13 @@ require 'erb'
 require 'hashie/mash'
 require 'net/http'
 require 'onelogin/ruby-saml'
-require 'pp'
 require 'sinatra/base'
 require 'uri'
 require 'yaml'
 require 'active_support/core_ext/object/to_query'
-require 'active_support/core_ext/object/blank'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
-
-  def init(uri)
-    @auth_server_uri = uri
-  end
-
-  def auth_server_uri
-    @auth_server_uri ||= URI('https://localhost:1234')
-  end
-
-  def get_param(key, acceptable_values)
-    value = params[key]
-    value if acceptable_values.include?(value)
-  end
 
   get '/' do
     agency = get_param(:agency, %w[uscis sba ed])
@@ -33,24 +18,24 @@ class RelyingParty < Sinatra::Base
     login_msg = session.delete(:login)
     if agency
       session[:agency] = agency
-      erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: logout_msg }
+      erb :"agency/#{agency}/index", layout: false, locals: { logout_msg: }
     else
       ial, aal, force_authn, skip_encryption = extract_params
 
       login_path = '/login_get?' + {
-        ial: ial,
-        aal: aal,
+        ial:,
+        aal:,
       }.to_query
 
       session.delete(:agency)
       erb :index, locals: {
-        ial: ial,
-        aal: aal,
-        force_authn: force_authn,
-        skip_encryption: skip_encryption,
-        logout_msg: logout_msg,
-        login_msg: login_msg,
-        login_path: login_path,
+        ial:,
+        aal:,
+        force_authn:,
+        skip_encryption:,
+        logout_msg:,
+        login_msg:,
+        login_path:,
         method: 'get',
       }
     end
@@ -58,24 +43,24 @@ class RelyingParty < Sinatra::Base
 
   get '/login_get/?' do
     puts 'Logging in via GET'
-    request = OneLogin::RubySaml::Authrequest.new
-    puts "Request: #{request}"
+    saml_auth_request = OneLogin::RubySaml::Authrequest.new
+    puts "Request: #{saml_auth_request}"
     ial, aal, force_authn, skip_encryption = extract_params
-    sml_set = saml_settings(ial: ial, aal: aal, force_authn: force_authn)
-    request_url = request.create(sml_set)
-    request_url += "&#{ { skip_encryption: skip_encryption }.to_query }" if skip_encryption
+    settings = saml_settings(ial:, aal:, force_authn:)
+    request_url = saml_auth_request.create(settings)
+    request_url += "&#{ { skip_encryption: }.to_query }" if skip_encryption
     redirect to(request_url)
   end
 
   get '/login_post/?' do
     puts 'Logging in via POST'
-    saml_request = OneLogin::RubySaml::Authrequest.new
-    puts "Request: #{saml_request}"
+    saml_auth_request = OneLogin::RubySaml::Authrequest.new
+    puts "Request: #{saml_auth_request}"
     ial, aal, force_authn, skip_encryption = extract_params
-    settings = saml_settings(ial: ial, aal: aal, force_authn: force_authn)
-    post_params = saml_request.create_params(settings, skip_encryption: skip_encryption, 'RelayState' => params[:id])
+    settings = saml_settings(ial:, aal:, force_authn:)
+    post_params = saml_auth_request.create_params(settings, skip_encryption:, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
-    erb :login_post, locals: { login_url: login_url, post_params: post_params }
+    erb :login_post, locals: { login_url:, post_params: }
   end
 
   post '/logout/?' do
@@ -144,6 +129,11 @@ class RelyingParty < Sinatra::Base
 
   private
 
+  def get_param(key, acceptable_values)
+    value = params[key]
+    value if acceptable_values.include?(value)
+  end
+
   def logout_session
     session.delete(:userid)
     session.delete(:email)
@@ -164,13 +154,10 @@ class RelyingParty < Sinatra::Base
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
-    base_config.ial_context = ial_authn_context(ial)
-    base_config.aal_context = aal_authn_context(aal, ial)
-    base_config.vtr_context = vtr_authn_context(ial:, aal:)
     base_config.authn_context = [
-      base_config.ial_context,
-      base_config.aal_context,
-      *base_config.vtr_context,
+      ial_authn_context(ial),
+      aal_authn_context(aal, ial),
+      *vtr_authn_context(ial:, aal:),
       'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
     ].compact
     base_config.force_authn = force_authn
@@ -289,12 +276,11 @@ class RelyingParty < Sinatra::Base
       puts 'Logout OK'
       logout_session
       session[:logout] = 'ok'
-      redirect to(home_page)
     else
       puts 'Logout failed'
       session[:logout] = 'fail'
-      redirect to(home_page)
     end
+    redirect to(home_page)
   end
 
   def idp_logout_response
@@ -364,7 +350,7 @@ class RelyingParty < Sinatra::Base
   def extract_params
     aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
     ial = get_param(:ial, %w[sp 1 2 0 biometric-comparison-vot biometric-comparison-preferred biometric-comparison-required step-up]) || '1'
-    ial = prepare_step_up_flow(session: session, ial: ial, aal: aal)
+    ial = prepare_step_up_flow(session:, ial:, aal:)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
     [ial, aal, force_authn, skip_encryption]
