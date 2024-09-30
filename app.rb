@@ -63,15 +63,20 @@ class RelyingParty < Sinatra::Base
   end
 
   post '/slo_logout/?' do
-    if params[:SAMLRequest]
-      puts 'SLO request came from IdP'
-      idp_logout_request
-    elsif params[:SAMLResponse]
-      puts 'SLO response received'
-      validate_slo_response
+    puts 'Logout response received'
+
+    logout_response = OneLogin::RubySaml::Logoutresponse.new(params[:SAMLResponse], saml_settings)
+
+    if logout_response.validate # ruby-saml uses is_valid? for some and validate for others inconsistently
+      puts 'Logout OK'
+      logout_session
+      session[:logout] = 'ok'
     else
-      sp_logout_request
+      puts 'Logout failed'
+      session[:logout] = 'fail'
     end
+
+    redirect to('/')
   end
 
   get '/success/?' do
@@ -85,11 +90,10 @@ class RelyingParty < Sinatra::Base
       params.fetch('SAMLResponse'), settings: saml_settings
     )
 
-    user_uuid = response.name_id.gsub(/^_/, '')
+    if response.is_valid? # ruby-saml uses is_valid? for some and validate for others inconsistently
+      user_uuid = response.name_id.gsub(/^_/, '')
+      puts "Got SAMLResponse from NAMEID: #{user_uuid}"
 
-    puts "Got SAMLResponse from NAMEID: #{user_uuid}"
-
-    if response.is_valid?
       if session.delete(:step_up_enabled)
         aal = session.delete(:step_up_aal)
 
@@ -216,61 +220,6 @@ class RelyingParty < Sinatra::Base
 
   def running_in_prod_env?
     @running_in_prod_env ||= URI.parse(ENV['idp_sso_target_url']).hostname.match?(/login\.gov/)
-  end
-
-  def idp_logout_request
-    logout_request = OneLogin::RubySaml::SloLogoutrequest.new(
-      params[:SAMLRequest],
-      settings: saml_settings
-    )
-    if logout_request.is_valid?
-      redirect_to_logout(logout_request)
-    else
-      render_logout_error(logout_request)
-    end
-  end
-
-  def redirect_to_logout(logout_request)
-    puts "IdP initiated Logout for #{logout_request.nameid}"
-    logout_session
-    logout_response = OneLogin::RubySaml::SloLogoutresponse.new.create(
-      saml_settings,
-      logout_request.id,
-      nil,
-      RelayState: params[:RelayState]
-    )
-    redirect to(logout_response)
-  end
-
-  def render_logout_error(logout_request)
-    error_msg = "IdP initiated LogoutRequest was not valid: #{logout_request.errors}"
-    puts error_msg
-    @errors = error_msg
-    erb :failure
-  end
-
-  def validate_slo_response
-    slo_response = idp_logout_response
-    if slo_response.validate
-      puts 'Logout OK'
-      logout_session
-      session[:logout] = 'ok'
-    else
-      puts 'Logout failed'
-      session[:logout] = 'fail'
-    end
-    redirect to('/')
-  end
-
-  def idp_logout_response
-    OneLogin::RubySaml::Logoutresponse.new(params[:SAMLResponse], saml_settings)
-  end
-
-  def sp_logout_request
-    settings = saml_settings.dup
-    settings.name_identifier_value = session[:user_id]
-    logout_request = OneLogin::RubySaml::Logoutrequest.new.create(settings)
-    redirect to(logout_request)
   end
 
   def prepare_step_up_flow(session:, ial:, aal: nil)

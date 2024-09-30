@@ -23,7 +23,7 @@ RSpec.describe RelyingParty do
     allow(OneLogin::RubySaml::Logging).to receive(:debug)
   end
 
-  context '/' do
+  describe '/' do
     it 'renders a link to the authorize endpoint' do
       get '/'
 
@@ -40,7 +40,7 @@ RSpec.describe RelyingParty do
     end
   end
 
-  context '/success' do
+  describe '/success' do
     it 'redirects to the root' do
       get '/success'
 
@@ -49,7 +49,7 @@ RSpec.describe RelyingParty do
     end
   end
 
-  context '/logout' do
+  describe '/logout' do
     before do
       stub_request(:get, ENV['idp_slo_target_url'])
     end
@@ -59,6 +59,62 @@ RSpec.describe RelyingParty do
 
       expect(last_response).to be_redirect
       expect(URI(last_response.location).path).to eq('/api/saml/logout')
+    end
+  end
+
+  describe '/slo_logout' do
+    let(:logout_response) do
+      instance_double(
+        OneLogin::RubySaml::Logoutresponse,
+      )
+    end
+
+    before do
+      allow(OneLogin::RubySaml::Logoutresponse).to receive(:new).and_return(logout_response)
+      allow(logout_response).to receive(:validate).and_return(valid_logout_response)
+
+      get '/'
+      env 'rack.session', {
+        userid: 'SOME_USERID',
+        email: 'subscriber@example.com',
+        attributes: 'SOME_ATTRIBUTES',
+        step_up_enabled: false,
+        step_up_aal: 2,
+      }
+    end
+
+    context 'when the logout response is valid' do
+      let(:valid_logout_response) { true }
+
+      it 'terminates the session' do
+        post '/slo_logout?SAMLResponse=anything'
+
+        expect(last_response).to be_redirect
+        expect(URI(last_response.location).path).to eq('/')
+        expect(last_request.session[:logout]).to eq('ok')
+        expect(last_request.session.keys).to_not include('userid')
+        expect(last_request.session.keys).to_not include('email')
+        expect(last_request.session.keys).to_not include('attributes')
+        expect(last_request.session.keys).to_not include('step_up_enabled')
+        expect(last_request.session.keys).to_not include('step_up_aal')
+      end
+    end
+
+    context 'when the logout response is invalid' do
+      let(:valid_logout_response) { false }
+
+      it 'redirects to root with a failure' do
+        post '/slo_logout?SAMLResponse=anything'
+
+        expect(last_response).to be_redirect
+        expect(URI(last_response.location).path).to eq('/')
+        expect(last_request.session[:logout]).to eq('fail')
+        expect(last_request.session.keys).to include('userid')
+        expect(last_request.session.keys).to include('email')
+        expect(last_request.session.keys).to include('attributes')
+        expect(last_request.session.keys).to include('step_up_enabled')
+        expect(last_request.session.keys).to include('step_up_aal')
+      end
     end
   end
 
@@ -312,6 +368,40 @@ RSpec.describe RelyingParty do
       expect(OneLogin::RubySaml::Settings).to have_received(:new)
         .with(hash_including(authn_context: expected_authn_context))
     end
+
+    context 'when 2-phishing_resistant aal is requested' do
+      let(:expected_authn_context) do
+        [
+          'http://idmanagement.gov/ns/assurance/ial/1',
+          'http://idmanagement.gov/ns/assurance/aal/2?phishing_resistant=true',
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+        ]
+      end
+
+      it 'sets the correct authn_context' do
+        get 'login_post/?aal=2-phishing_resistant'
+
+        expect(OneLogin::RubySaml::Settings).to have_received(:new)
+          .with(hash_including(authn_context: expected_authn_context))
+      end
+    end
+
+    context 'when 2-hspd12 aal is requested' do
+      let(:expected_authn_context) do
+        [
+          'http://idmanagement.gov/ns/assurance/ial/1',
+          'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true',
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+        ]
+      end
+
+      it 'sets the correct authn_context' do
+        get 'login_post/?aal=2-hspd12'
+
+        expect(OneLogin::RubySaml::Settings).to have_received(:new)
+          .with(hash_including(authn_context: expected_authn_context))
+      end
+    end
   end
 
   describe 'consume' do
@@ -321,23 +411,47 @@ RSpec.describe RelyingParty do
     let(:response) do
       instance_double(
         OneLogin::RubySaml::Response,
-        is_valid?: true,
         name_id: expected_name_id,
-        attributes: expected_attributes
+        attributes: expected_attributes,
+        errors: []
       )
     end
 
     before do
       allow(OneLogin::RubySaml::Response).to receive(:new).and_return(response)
+      allow(response).to receive(:is_valid?).and_return(valid_response)
     end
 
-    it 'saves the correct values in the session' do
-      post 'consume?SAMLResponse=something'
-      follow_redirect!
+    context 'when the response is valid' do
+      let(:valid_response) { true }
 
-      expect(last_request.session[:userid]).to eq(expected_name_id)
-      expect(last_request.session[:email]).to eq(expected_email)
-      expect(JSON.parse(last_request.session[:attributes])).to eq(expected_attributes)
+      it 'saves the correct values in the session' do
+        post 'consume?SAMLResponse=something'
+        follow_redirect!
+
+        expect(last_request.session[:userid]).to eq(expected_name_id)
+        expect(last_request.session[:email]).to eq(expected_email)
+        expect(JSON.parse(last_request.session[:attributes])).to eq(expected_attributes)
+      end
+    end
+
+    context 'when the response is invalid' do
+      let(:valid_response) { false }
+
+      it 'shows an authentication failure page' do
+        post 'consume?SAMLResponse=something'
+
+        expect(last_response).to be_ok
+        expect(last_response.body).to include('Authentication Failure!')
+      end
+    end
+  end
+
+  describe 'failure_to_proof' do
+    it 'shows the failure to proof page' do
+      get '/failure_to_proof'
+      expect(last_response).to be_ok
+      expect(last_response.body).to include('We were unable to verify your identity')
     end
   end
 end
