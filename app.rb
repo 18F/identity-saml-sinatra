@@ -11,6 +11,26 @@ require 'active_support/core_ext/object/to_query'
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
 
+  helpers do
+    def ial_select_options
+      options = [
+        ['sp', 'Service Provider setting'],
+        ['1', 'Authentication only (default)'],
+        ['2', 'Identity-verified'],
+        ['0', 'IALMax'],
+        ['facial-match-preferred', 'Facial Match Preferred (ACR)'],
+        ['facial-match-required', 'Facial Match Required (ACR)'],
+        ['step-up', 'Step-up Flow'],
+      ]
+
+      if !ENV['vtr_disabled']
+        options.push ['facial-match-vot', 'Facial Match (VOT)']
+      end
+
+      options
+    end
+  end
+
   get '/' do
     logout_msg = session.delete(:logout)
     login_msg = session.delete(:login)

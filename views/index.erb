@@ -111,19 +111,8 @@
                     Level of Service
                   </label>
                   <select name="ial" id="ial" class="usa-select">
-                    <% [
-                      ['sp', 'Service Provider setting'],
-                      ['1', 'Authentication only (default)'],
-                      ['2', 'Identity-verified'],
-                      ['0', 'IALMax'],
-                      ['facial-match-vot', 'Facial Match (VOT)'],
-                      ['facial-match-preferred', 'Facial Match Preferred (ACR)'],
-                      ['facial-match-required', 'Facial Match Required (ACR)'],
-                      ['step-up', 'Step-up Flow'],
-                    ].compact.each do |value, label| %>
-                      <option value="<%= value %>"
-                              <%= 'selected="true"' if ial == value %>
-                              >
+                    <% ial_select_options.each do |value, label| %>
+                      <option value="<%= value %>" <%= 'selected="true"' if ial == value %> >
                         <%= label %>
                       </option>
                     <% end %>
