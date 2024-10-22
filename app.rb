@@ -187,7 +187,7 @@ class RelyingParty < Sinatra::Base
 
     values << {
       '2' => 'P1',
-      'biometric-comparison-vot' => 'P1.Pb',
+      'facial-match-vot' => 'P1.Pb',
     }[ial]
 
     vtr_list = [values.compact.join('.')]
@@ -240,7 +240,7 @@ class RelyingParty < Sinatra::Base
   end
 
   def vtr_needed?(ial)
-    vtr_enabled? && ial == 'biometric-comparison-vot'
+    vtr_enabled? && ial == 'facial-match-vot'
   end
 
   def vtr_enabled?
@@ -260,8 +260,8 @@ class RelyingParty < Sinatra::Base
       '0' => 'http://idmanagement.gov/ns/assurance/ial/0',
       '1' => 'http://idmanagement.gov/ns/assurance/ial/1',
       '2' => 'http://idmanagement.gov/ns/assurance/ial/2',
-      'biometric-comparison-preferred' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
-      'biometric-comparison-required' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=required',
+      'facial-match-preferred' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
+      'facial-match-required' => 'http://idmanagement.gov/ns/assurance/ial/2?bio=required',
     }
   end
 
@@ -270,14 +270,14 @@ class RelyingParty < Sinatra::Base
       '0' => 'http://idmanagement.gov/ns/assurance/ial/0',
       '1' => 'urn:acr.login.gov:auth-only',
       '2' => 'urn:acr.login.gov:verified',
-      'biometric-comparison-required' => 'urn:acr.login.gov:verified-facial-match-required',
-      'biometric-comparison-preferred' => 'urn:acr.login.gov:verified-facial-match-preferred',
+      'facial-match-required' => 'urn:acr.login.gov:verified-facial-match-required',
+      'facial-match-preferred' => 'urn:acr.login.gov:verified-facial-match-preferred',
     }
   end
 
   def extract_params
     aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
-    ial = get_param(:ial, %w[sp 1 2 0 biometric-comparison-vot biometric-comparison-preferred biometric-comparison-required step-up]) || '1'
+    ial = get_param(:ial, %w[sp 1 2 0 facial-match-vot facial-match-preferred facial-match-required step-up]) || '1'
     ial = prepare_step_up_flow(session:, ial:, aal:)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
