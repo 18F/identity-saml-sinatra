@@ -213,7 +213,7 @@ RSpec.describe RelyingParty do
           end
         end
 
-        context 'when biometric-comparison-preferred is selected' do
+        context 'when facial-match-preferred is selected' do
           let(:expected_authn_context) do
             ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
             'http://idmanagement.gov/ns/assurance/aal/2',
@@ -221,7 +221,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get?ial=biometric-comparison-preferred'
+            get '/login_get?ial=facial-match-preferred'
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -241,7 +241,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get '/login_get?ial=biometric-comparison-preferred'
+              get '/login_get?ial=facial-match-preferred'
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -249,7 +249,7 @@ RSpec.describe RelyingParty do
           end
         end
 
-        context 'when biometric-comparison-required is selected' do
+        context 'when facial-match-required is selected' do
           let(:expected_authn_context) do
             ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
             'http://idmanagement.gov/ns/assurance/aal/2',
@@ -257,7 +257,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get?ial=biometric-comparison-required'
+            get '/login_get?ial=facial-match-required'
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -277,7 +277,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get '/login_get?ial=biometric-comparison-required'
+              get '/login_get?ial=facial-match-required'
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -329,7 +329,7 @@ RSpec.describe RelyingParty do
           end
         end
 
-        context 'when the biometric comparison is requested' do
+        context 'when the facial match is requested' do
           let(:expected_authn_context) do
             [
               'C1.C2.P1.Pb',
@@ -338,7 +338,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get/?ial=biometric-comparison-vot'
+            get '/login_get/?ial=facial-match-vot'
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
