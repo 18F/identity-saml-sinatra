@@ -6,7 +6,7 @@ ruby "~> #{File.read(File.join(__dir__, '.ruby-version')).strip}"
 gem 'aws-sdk-s3', '~> 1.30'
 gem 'dotenv'
 gem 'hashie'
-gem 'rexml'
+gem 'rexml', '>= 3.3.9'
 gem 'ruby-saml', '>= 1.9.0'
 gem 'rack-test', '>= 2.0.0'
 gem 'rake'
