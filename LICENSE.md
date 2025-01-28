@@ -1,4 +1,4 @@
-As a work of the United States government, this project is in the
+LICENSE.md As a work of the United States government, this project is in the
 public domain within the United States.
 
 Additionally, we waive copyright and related rights in the work
