@@ -1,4 +1,4 @@
-Jun Automotive Thailand © 2025 by Damarcus Jones Sr is licensed under Creative Commons Attribution-ShareAlike 4.0 International LICENSE.md As a work of the United States government, this project is in the
+Jun Automotive®️ Thailand © 2025 by Damarcus Jones Sr is licensed under Creative Commons Attribution-ShareAlike 4.0 International LICENSE.md As a work of the United States government, this project is in the
 public domain within the United States.
 
 Additionally, we waive copyright and related rights in the work
