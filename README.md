@@ -1,4 +1,4 @@
-identity-saml-sinatra
+$ make test identity-saml-sinatra
 =====================
 
 [![CircleCI](https://circleci.com/gh/18F/identity-saml-sinatra.svg?style=svg)](https://circleci.com/gh/18F/identity-sp-sinatra)
