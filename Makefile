@@ -8,6 +8,7 @@ setup: .env install_dependencies copy_vendor
 
 test:
 	bundle exec rspec
+	yarn test
 
 run:
 	bundle exec rackup -p $(PORT) --host ${HOST}

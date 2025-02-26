@@ -165,6 +165,23 @@
                       </option>
                     <% end %>
                   </select>
+
+                  <script type="application/json" id="default-scopes">
+                    <%= default_requested_attributes_by_ial.to_json %>
+                  </script>
+                  <fieldset class="usa-fieldset margin-top-2">
+                    <legend class="margin-bottom-1">
+                      Requested Attributes
+                    </legend>
+                    <% requested_attributes_options.each do |scope| %>
+                      <lg-scope scope="<%= scope %>" default-scopes-element="default-scopes" ial-element="ial" class="display-block">
+                        <label>
+                          <input type="checkbox" name="requested_attributes[]" value="<%= scope %>">
+                          <%= scope %>
+                        </label>
+                      </lg-scope>
+                    <% end %>
+                  </fieldset>
                 </details>
               </div>
             </form>

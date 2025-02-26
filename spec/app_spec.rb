@@ -119,19 +119,22 @@ RSpec.describe RelyingParty do
   end
 
   describe 'login_get' do
+    let(:params) { { requested_attributes: ['x509_presented', 'email'] } }
+
     before do
       allow(OneLogin::RubySaml::Settings).to receive(:new)
         .and_call_original
     end
 
     describe 'force_authn' do
+      let(:params) { super().merge(force_authn: expected_force_authn) }
       let(:expected_force_authn) { nil }
 
       context 'when force_authn is true' do
         let(:expected_force_authn) { 'true' }
 
         it 'calls Saml::Settings with the correct value for force_authn' do
-          get "/login_get?force_authn=#{expected_force_authn}"
+          get '/login_get', **params
 
           expect(OneLogin::RubySaml::Settings).to have_received(:new)
             .with(hash_including('force_authn' => expected_force_authn))
@@ -142,7 +145,7 @@ RSpec.describe RelyingParty do
         let(:expected_force_authn) { 'false' }
 
         it 'calls Saml::Settings with the correct value for force_authn' do
-          get "/login_get?force_authn=#{expected_force_authn}"
+          get '/login_get', **params
 
           expect(OneLogin::RubySaml::Settings).to have_received(:new)
             .with(hash_including('force_authn' => expected_force_authn))
@@ -160,13 +163,13 @@ RSpec.describe RelyingParty do
       it 'requires expicit env var sp_cert' do
         ENV.delete('sp_cert')
 
-        expect { get '/login_get' }.to raise_error(NotImplementedError)
+        expect { get '/login_get', **params }.to raise_error(NotImplementedError)
       end
 
       it 'requires expicit env var sp_private_key' do
         ENV.delete('sp_private_key')
 
-        expect { get '/login_get' }.to raise_error(NotImplementedError)
+        expect { get '/login_get', **params }.to raise_error(NotImplementedError)
       end
     end
 
@@ -185,7 +188,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get'
+            get '/login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -205,7 +208,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get 'login_get'
+              get 'login_get', **params
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -214,6 +217,7 @@ RSpec.describe RelyingParty do
         end
 
         context 'when facial-match-preferred is selected' do
+          let(:params) { super().merge(ial: 'facial-match-preferred') }
           let(:expected_authn_context) do
             ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
             'http://idmanagement.gov/ns/assurance/aal/2',
@@ -221,7 +225,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get?ial=facial-match-preferred'
+            get '/login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -241,7 +245,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get '/login_get?ial=facial-match-preferred'
+              get '/login_get', **params
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -250,6 +254,7 @@ RSpec.describe RelyingParty do
         end
 
         context 'when facial-match-required is selected' do
+          let(:params) { super().merge(ial: 'facial-match-required') }
           let(:expected_authn_context) do
             ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
             'http://idmanagement.gov/ns/assurance/aal/2',
@@ -257,7 +262,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get?ial=facial-match-required'
+            get '/login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -277,7 +282,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get '/login_get?ial=facial-match-required'
+              get '/login_get', **params
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -301,7 +306,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get'
+            get '/login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -321,7 +326,7 @@ RSpec.describe RelyingParty do
             end
 
             it 'sets the correct authn_context' do
-              get 'login_get'
+              get 'login_get', **params
 
               expect(OneLogin::RubySaml::Settings).to have_received(:new)
                 .with(hash_including(authn_context: expected_authn_context))
@@ -330,6 +335,7 @@ RSpec.describe RelyingParty do
         end
 
         context 'when the facial match is requested' do
+          let(:params) { super().merge(ial: 'facial-match-vot') }
           let(:expected_authn_context) do
             [
               'C1.C2.P1.Pb',
@@ -338,7 +344,7 @@ RSpec.describe RelyingParty do
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get/?ial=facial-match-vot'
+            get '/login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
@@ -349,6 +355,8 @@ RSpec.describe RelyingParty do
   end
 
   describe 'login_post' do
+    let(:params) { { requested_attributes: ['x509_presented', 'email'] } }
+
     before do
       allow(OneLogin::RubySaml::Settings).to receive(:new)
         .and_call_original
@@ -363,13 +371,14 @@ RSpec.describe RelyingParty do
     end
 
     it 'sets the correct authn_context' do
-      get 'login_post'
+      get 'login_post', **params
 
       expect(OneLogin::RubySaml::Settings).to have_received(:new)
         .with(hash_including(authn_context: expected_authn_context))
     end
 
     context 'when 2-phishing_resistant aal is requested' do
+      let(:params) { super().merge(aal: '2-phishing_resistant') }
       let(:expected_authn_context) do
         [
           'http://idmanagement.gov/ns/assurance/ial/1',
@@ -379,7 +388,7 @@ RSpec.describe RelyingParty do
       end
 
       it 'sets the correct authn_context' do
-        get 'login_post/?aal=2-phishing_resistant'
+        get 'login_post', **params
 
         expect(OneLogin::RubySaml::Settings).to have_received(:new)
           .with(hash_including(authn_context: expected_authn_context))
@@ -387,6 +396,7 @@ RSpec.describe RelyingParty do
     end
 
     context 'when 2-hspd12 aal is requested' do
+      let(:params) { super().merge(aal: '2-hspd12') }
       let(:expected_authn_context) do
         [
           'http://idmanagement.gov/ns/assurance/ial/1',
@@ -396,7 +406,7 @@ RSpec.describe RelyingParty do
       end
 
       it 'sets the correct authn_context' do
-        get 'login_post/?aal=2-hspd12'
+        get 'login_post', **params
 
         expect(OneLogin::RubySaml::Settings).to have_received(:new)
           .with(hash_including(authn_context: expected_authn_context))

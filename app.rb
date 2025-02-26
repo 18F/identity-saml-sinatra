@@ -29,6 +29,63 @@ class RelyingParty < Sinatra::Base
 
       options
     end
+
+    def requested_attributes_options
+      # https://developers.login.gov/attributes/
+      %w[
+        uuid
+        email
+        all_emails
+        ial
+        aal
+        first_name
+        last_name
+        address1
+        address2
+        city
+        state
+        zipcode
+        phone
+        dob
+        ssn
+        verified_at
+        x509_issuer
+        x509_subject
+        x509_presented
+      ]
+    end
+
+    def default_requested_attributes_by_ial
+      ial2_options = [
+        '2',
+        'facial-match-preferred',
+        'facial-match-required',
+        'facial-match-vot',
+        'enhanced-ipp-required',
+      ]
+
+      default_requested_attributes_by_ial = {
+        nil => %w[email x509_presented],
+        '0' => %w[email ssn x509_presented],
+        '1' => %w[email x509_presented],
+      }
+
+      ial2_options.each do |ial2_option|
+        default_requested_attributes_by_ial[ial2_option] = %w[
+          email
+          ssn
+          phone
+          address1
+          address2
+          city
+          state
+          zipcode
+          x509_presented
+        ]
+      end
+
+      default_requested_attributes_by_ial
+    end
   end
 
   get '/' do
@@ -57,8 +114,8 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via GET'
     saml_auth_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_auth_request}"
-    ial, aal, force_authn, skip_encryption = extract_params
-    settings = saml_settings(ial:, aal:, force_authn:)
+    ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
+    settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
     request_url = saml_auth_request.create(settings)
     request_url += "&#{ { skip_encryption: }.to_query }" if skip_encryption
     redirect to(request_url)
@@ -68,8 +125,8 @@ class RelyingParty < Sinatra::Base
     puts 'Logging in via POST'
     saml_auth_request = OneLogin::RubySaml::Authrequest.new
     puts "Request: #{saml_auth_request}"
-    ial, aal, force_authn, skip_encryption = extract_params
-    settings = saml_settings(ial:, aal:, force_authn:)
+    ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
+    settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
     post_params = saml_auth_request.create_params(settings, skip_encryption:, 'RelayState' => params[:id])
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url:, post_params: }
@@ -142,7 +199,12 @@ class RelyingParty < Sinatra::Base
 
   def get_param(key, acceptable_values)
     value = params[key]
-    value if acceptable_values.include?(value)
+    case value
+    when String
+      value if acceptable_values.include?(value)
+    when Array
+      value & acceptable_values
+    end
   end
 
   def logout_session
@@ -153,7 +215,7 @@ class RelyingParty < Sinatra::Base
     session.delete(:step_up_aal)
   end
 
-  def saml_settings(ial: nil, aal: nil, force_authn: false)
+  def saml_settings(ial: nil, aal: nil, requested_attributes: [], force_authn: false)
     template = File.read('config/saml_settings.yml')
     base_config = Hashie::Mash.new(YAML.safe_load(ERB.new(template).result(binding)))
 
@@ -161,7 +223,7 @@ class RelyingParty < Sinatra::Base
       ial_authn_context(ial),
       aal_authn_context(aal, ial),
       *vtr_authn_context(ial:, aal:),
-      'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
+      "http://idmanagement.gov/ns/requested_attributes?ReqAttr=#{requested_attributes.join(',')}",
     ].compact
     base_config.force_authn = force_authn
 
@@ -301,7 +363,8 @@ class RelyingParty < Sinatra::Base
     ial = prepare_step_up_flow(session:, ial:, aal:)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])
-    [ial, aal, force_authn, skip_encryption]
+    requested_attributes = get_param(:requested_attributes, requested_attributes_options) || []
+    [ial, aal, force_authn, skip_encryption, requested_attributes]
   end
 
   run! if app_file == $0
