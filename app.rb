@@ -9,7 +9,7 @@ require 'yaml'
 require 'active_support/core_ext/object/to_query'
 
 class RelyingParty < Sinatra::Base
-  use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.uuid
+  use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
 
   helpers do
     def ial_select_options
