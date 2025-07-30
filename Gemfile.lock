@@ -41,12 +41,12 @@ GEM
     jmespath (1.6.1)
     logger (1.7.0)
     method_source (1.0.0)
-    mini_portile2 (2.8.8)
+    mini_portile2 (2.8.9)
     minitest (5.19.0)
     mustermann (3.0.3)
       ruby2_keywords (~> 0.0.1)
     nio4r (2.7.4)
-    nokogiri (1.18.6)
+    nokogiri (1.15.7)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
     power_assert (2.0.2)
@@ -84,7 +84,7 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.1)
-    ruby-saml (1.18.0)
+    ruby-saml (1.18.1)
       nokogiri (>= 1.13.10)
       rexml
     ruby2_keywords (0.0.5)
@@ -127,14 +127,14 @@ DEPENDENCIES
   rake
   rexml
   rspec
-  ruby-saml (>= 1.9.0)
+  ruby-saml (>= 1.18.1)
   simplecov
   sinatra (>= 3.0.4)
   test-unit
   webmock
 
 RUBY VERSION
-   ruby 3.3.4p94
+   ruby 2.7.8p225
 
 BUNDLED WITH
    2.6.5
