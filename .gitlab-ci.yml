@@ -4,7 +4,7 @@
 variables:
   BUNDLER_VERSION: "2.3.13"
   ECR_REGISTRY: '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
-  SAML_SINATRA_CI_SHA: 'sha256:fc49828b6a7b03a65bf286eed4c0fd4de0b0e83169dc60cfd024920d60faa8a8'
+  SAML_SINATRA_CI_SHA: 'sha256:17829ab15871c68c1dfd57a65a7a16e1a9ae2de84ccdcac104246a02af6a941f'
 
 default:
   image: '${ECR_REGISTRY}/saml_sinatra/ci@${SAML_SINATRA_CI_SHA}'
@@ -91,6 +91,18 @@ test_release:
   artifacts:
     paths:
       - /tmp/test-results
+
+lint:
+  stage: test
+  needs:
+    - job: install_dependencies
+  cache:
+    - <<: *ruby_cache
+    - <<: *yarn_cache
+  script:
+    - *bundle_install
+    - *yarn_install
+    - make lint
 
 build-ci-image:
   stage: .pre

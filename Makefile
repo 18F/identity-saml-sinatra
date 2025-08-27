@@ -10,6 +10,11 @@ test:
 	bundle exec rspec
 	yarn test
 
+lint:
+	@echo "--- rubocop ---"
+	bundle exec bundler-audit check --update
+	yarn audit
+
 run:
 	bundle exec rackup -p $(PORT) --host ${HOST}
 
