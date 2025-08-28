@@ -13,11 +13,8 @@ default:
   - gem install bundler --version $BUNDLER_VERSION
   - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/bundle
 
-.yarn_install: &yarn_install
-  - yarn install --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
-
-.yarn_production_install: &yarn_production_install
-  - yarn install --production --frozen-lockfile --ignore-engines --cache-folder .yarn-cache
+.npm_install: &npm_install
+  - npm ci --cache=.npm-cache
 
 .deploy_script: &deploy_script
   - *bundle_install
@@ -34,20 +31,12 @@ default:
       - vendor/bundle
     policy: pull
 
-  - &yarn_cache
+  - &npm_cache
     key:
       files:
-        - yarn.lock
+        - package-lock.json
     paths:
-      - .yarn-cache/
-    policy: pull
-
-  - &yarn_production_cache
-    key:
-      files:
-        - yarn.lock
-    paths:
-      - .yarn-cache/
+      - .npm-cache/
     policy: pull
 
 stages:
@@ -66,15 +55,14 @@ install_dependencies:
   stage: .pre
   variables:
     RAILS_ENV: test
-    SKIP_YARN_INSTALL: 'true'
   cache:
     - <<: *ruby_cache
       policy: pull-push
-    - <<: *yarn_cache
+    - <<: *npm_cache
       policy: pull-push
   script:
     - *bundle_install
-    - *yarn_install
+    - *npm_install
     - bundle exec rake login:deploy_json
 
 test_release:
@@ -83,10 +71,10 @@ test_release:
     - job: install_dependencies
   cache:
     - <<: *ruby_cache
-    - <<: *yarn_cache
+    - <<: *npm_cache
   script:
     - *bundle_install
-    - *yarn_install
+    - *npm_install
     - make test
   artifacts:
     paths:
@@ -98,10 +86,10 @@ lint:
     - job: install_dependencies
   cache:
     - <<: *ruby_cache
-    - <<: *yarn_cache
+    - <<: *npm_cache
   script:
     - *bundle_install
-    - *yarn_install
+    - *npm_install
     - make lint
 
 build-ci-image:
