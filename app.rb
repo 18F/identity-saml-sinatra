@@ -112,7 +112,7 @@ class RelyingParty < Sinatra::Base
     ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
     settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
     request_url = saml_auth_request.create(settings)
-    request_url += "&#{ { skip_encryption: true }.to_query }" # if skip_encryption
+    request_url += "&#{ { skip_encryption: }.to_query }" if skip_encryption
     redirect to(request_url)
   end
 
