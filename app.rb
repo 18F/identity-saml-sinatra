@@ -23,10 +23,6 @@ class RelyingParty < Sinatra::Base
         ['step-up', 'Step-up Flow'],
       ]
 
-      if !ENV['vtr_disabled']
-        options.push ['facial-match-vot', 'Facial Match (VOT)']
-      end
-
       options
     end
 
@@ -60,7 +56,6 @@ class RelyingParty < Sinatra::Base
         '2',
         'facial-match-preferred',
         'facial-match-required',
-        'facial-match-vot',
         'enhanced-ipp-required',
       ]
 
@@ -117,7 +112,7 @@ class RelyingParty < Sinatra::Base
     ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
     settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
     request_url = saml_auth_request.create(settings)
-    request_url += "&#{ { skip_encryption: }.to_query }" if skip_encryption
+    request_url += "&#{ { skip_encryption: true }.to_query }" # if skip_encryption
     redirect to(request_url)
   end
 
@@ -222,7 +217,6 @@ class RelyingParty < Sinatra::Base
     base_config.authn_context = [
       ial_authn_context(ial),
       aal_authn_context(aal, ial),
-      *vtr_authn_context(ial:, aal:),
       "http://idmanagement.gov/ns/requested_attributes?ReqAttr=#{requested_attributes.join(',')}",
     ].compact
     base_config.force_authn = force_authn
@@ -234,8 +228,6 @@ class RelyingParty < Sinatra::Base
   end
 
   def ial_authn_context(ial)
-    return nil if vtr_needed?(ial)
-
     if semantic_ial_values_enabled?
       semantic_ial_values[ial]
     else
@@ -244,8 +236,6 @@ class RelyingParty < Sinatra::Base
   end
 
   def aal_authn_context(aal, ial)
-    return nil if vtr_needed?(ial)
-
     case aal
     when '2'
       'http://idmanagement.gov/ns/assurance/aal/2'
@@ -254,30 +244,6 @@ class RelyingParty < Sinatra::Base
     when '2-hspd12'
       'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true'
     end
-  end
-
-  def vtr_authn_context(ial:, aal:)
-    return nil unless vtr_needed?(ial)
-
-    values = ['C1']
-
-    values << {
-      '2' => 'C2',
-      '2-phishing_resistant' => 'C2.Ca',
-      '2-hspd12' => 'C2.Cb',
-    }[aal]
-
-    values << {
-      '2' => 'P1',
-      'facial-match-vot' => 'P1.Pb',
-    }[ial]
-
-    vtr_list = [values.compact.join('.')]
-    if ial == '0'
-      proofing_vector = values.dup + ['P1']
-      vtr_list = [proofing_vector.compact.join('.'), *vtr_list]
-    end
-    vtr_list
   end
 
   def saml_sp_certificate
@@ -321,18 +287,6 @@ class RelyingParty < Sinatra::Base
     ssn&.gsub(/\d/, '#')
   end
 
-  def vtr_needed?(ial)
-    vtr_enabled? && ial == 'facial-match-vot'
-  end
-
-  def vtr_enabled?
-    !vtr_disabled?
-  end
-
-  def vtr_disabled?
-    ENV['vtr_disabled'] == 'true'
-  end
-
   def semantic_ial_values_enabled?
     ENV['semantic_ial_values_enabled'] == 'true'
   end
@@ -359,7 +313,7 @@ class RelyingParty < Sinatra::Base
 
   def extract_params
     aal = get_param(:aal, %w[sp 1 2 2-phishing_resistant 2-hspd12]) || '2'
-    ial = get_param(:ial, %w[sp 1 2 0 facial-match-vot facial-match-preferred facial-match-required step-up]) || '1'
+    ial = get_param(:ial, %w[sp 1 2 0  facial-match-preferred facial-match-required step-up]) || '1'
     ial = prepare_step_up_flow(session:, ial:, aal:)
     force_authn = get_param(:force_authn, %w[true false])
     skip_encryption = get_param(:skip_encryption, %w[true false])

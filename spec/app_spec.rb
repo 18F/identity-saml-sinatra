@@ -175,131 +175,65 @@ RSpec.describe RelyingParty do
 
     describe 'authn_context' do
       let(:expected_authn_context) { nil }
-      context 'with vtr_disabled' do
-        before do
-          ENV['vtr_disabled'] = 'true'
+      context 'when the default parameters are used' do
+        let(:expected_authn_context) do
+          ['http://idmanagement.gov/ns/assurance/ial/1',
+          'http://idmanagement.gov/ns/assurance/aal/2',
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
 
-        context 'when the default parameters are used' do
+        it 'sets the correct authn_context' do
+          get '/login_get', **params
+
+          expect(OneLogin::RubySaml::Settings).to have_received(:new)
+            .with(hash_including(authn_context: expected_authn_context))
+        end
+
+        context 'when semantic ial values are enabled' do
+          before do
+            ENV['semantic_ial_values_enabled'] = 'true'
+          end
+
           let(:expected_authn_context) do
-            ['http://idmanagement.gov/ns/assurance/ial/1',
-            'http://idmanagement.gov/ns/assurance/aal/2',
-            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
+            [
+              'urn:acr.login.gov:auth-only',
+              'http://idmanagement.gov/ns/assurance/aal/2',
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+            ]
           end
 
           it 'sets the correct authn_context' do
-            get '/login_get', **params
+            get 'login_get', **params
 
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
-          end
-
-          context 'when semantic ial values are enabled' do
-            before do
-              ENV['semantic_ial_values_enabled'] = 'true'
-            end
-
-            let(:expected_authn_context) do
-              [
-                'urn:acr.login.gov:auth-only',
-                'http://idmanagement.gov/ns/assurance/aal/2',
-                'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
-              ]
-            end
-
-            it 'sets the correct authn_context' do
-              get 'login_get', **params
-
-              expect(OneLogin::RubySaml::Settings).to have_received(:new)
-                .with(hash_including(authn_context: expected_authn_context))
-            end
-          end
-        end
-
-        context 'when facial-match-preferred is selected' do
-          let(:params) { super().merge(ial: 'facial-match-preferred') }
-          let(:expected_authn_context) do
-            ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
-            'http://idmanagement.gov/ns/assurance/aal/2',
-            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
-          end
-
-          it 'sets the correct authn_context' do
-            get '/login_get', **params
-
-            expect(OneLogin::RubySaml::Settings).to have_received(:new)
-              .with(hash_including(authn_context: expected_authn_context))
-          end
-
-          context 'when semantic ial values are enabled' do
-            before do
-              ENV['semantic_ial_values_enabled'] = 'true'
-            end
-
-            let(:expected_authn_context) do
-              [
-                'urn:acr.login.gov:verified-facial-match-preferred',
-                'http://idmanagement.gov/ns/assurance/aal/2',
-                'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
-              ]
-            end
-
-            it 'sets the correct authn_context' do
-              get '/login_get', **params
-
-              expect(OneLogin::RubySaml::Settings).to have_received(:new)
-                .with(hash_including(authn_context: expected_authn_context))
-            end
-          end
-        end
-
-        context 'when facial-match-required is selected' do
-          let(:params) { super().merge(ial: 'facial-match-required') }
-          let(:expected_authn_context) do
-            ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
-            'http://idmanagement.gov/ns/assurance/aal/2',
-            'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
-          end
-
-          it 'sets the correct authn_context' do
-            get '/login_get', **params
-
-            expect(OneLogin::RubySaml::Settings).to have_received(:new)
-              .with(hash_including(authn_context: expected_authn_context))
-          end
-
-          context 'when semantic ial values are enabled' do
-            before do
-              ENV['semantic_ial_values_enabled'] = 'true'
-            end
-
-            let(:expected_authn_context) do
-              [
-                'urn:acr.login.gov:verified-facial-match-required',
-                'http://idmanagement.gov/ns/assurance/aal/2',
-                'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
-              ]
-            end
-
-            it 'sets the correct authn_context' do
-              get '/login_get', **params
-
-              expect(OneLogin::RubySaml::Settings).to have_received(:new)
-                .with(hash_including(authn_context: expected_authn_context))
-            end
           end
         end
       end
 
-      context 'with vtr enabled' do
-        before do
-          ENV['vtr_disabled'] = 'false'
+      context 'when facial-match-preferred is selected' do
+        let(:params) { super().merge(ial: 'facial-match-preferred') }
+        let(:expected_authn_context) do
+          ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
+          'http://idmanagement.gov/ns/assurance/aal/2',
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
 
-        context 'when the default parameters are used' do
+        it 'sets the correct authn_context' do
+          get '/login_get', **params
+
+          expect(OneLogin::RubySaml::Settings).to have_received(:new)
+            .with(hash_including(authn_context: expected_authn_context))
+        end
+
+        context 'when semantic ial values are enabled' do
+          before do
+            ENV['semantic_ial_values_enabled'] = 'true'
+          end
+
           let(:expected_authn_context) do
             [
-              'http://idmanagement.gov/ns/assurance/ial/1',
+              'urn:acr.login.gov:verified-facial-match-preferred',
               'http://idmanagement.gov/ns/assurance/aal/2',
               'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
             ]
@@ -311,34 +245,33 @@ RSpec.describe RelyingParty do
             expect(OneLogin::RubySaml::Settings).to have_received(:new)
               .with(hash_including(authn_context: expected_authn_context))
           end
+        end
+      end
 
-          context 'when semantic ial values are enabled' do
-            before do
-              ENV['semantic_ial_values_enabled'] = 'true'
-            end
-
-            let(:expected_authn_context) do
-              [
-                'urn:acr.login.gov:auth-only',
-                'http://idmanagement.gov/ns/assurance/aal/2',
-                'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
-              ]
-            end
-
-            it 'sets the correct authn_context' do
-              get 'login_get', **params
-
-              expect(OneLogin::RubySaml::Settings).to have_received(:new)
-                .with(hash_including(authn_context: expected_authn_context))
-            end
-          end
+      context 'when facial-match-required is selected' do
+        let(:params) { super().merge(ial: 'facial-match-required') }
+        let(:expected_authn_context) do
+          ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
+          'http://idmanagement.gov/ns/assurance/aal/2',
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
         end
 
-        context 'when the facial match is requested' do
-          let(:params) { super().merge(ial: 'facial-match-vot') }
+        it 'sets the correct authn_context' do
+          get '/login_get', **params
+
+          expect(OneLogin::RubySaml::Settings).to have_received(:new)
+            .with(hash_including(authn_context: expected_authn_context))
+        end
+
+        context 'when semantic ial values are enabled' do
+          before do
+            ENV['semantic_ial_values_enabled'] = 'true'
+          end
+
           let(:expected_authn_context) do
             [
-              'C1.C2.P1.Pb',
+              'urn:acr.login.gov:verified-facial-match-required',
+              'http://idmanagement.gov/ns/assurance/aal/2',
               'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
             ]
           end
