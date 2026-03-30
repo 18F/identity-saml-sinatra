@@ -3,7 +3,7 @@ source 'https://rubygems.org'
 
 ruby "~> #{File.read(File.join(__dir__, '.ruby-version')).strip}"
 
-gem 'aws-sdk-s3', '~> 1.30'
+gem 'aws-sdk-s3', '>= 1.208.0'
 gem 'dotenv'
 gem 'hashie'
 gem 'rexml'
