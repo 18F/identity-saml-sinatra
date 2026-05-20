@@ -51,7 +51,8 @@ GEM
     dotenv (3.2.0)
     drb (2.2.3)
     hashdiff (1.1.0)
-    hashie (3.6.0)
+    hashie (5.1.0)
+      logger
     i18n (1.14.8)
       concurrent-ruby (~> 1.0)
     jmespath (1.6.2)
