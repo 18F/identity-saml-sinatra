@@ -70,7 +70,7 @@ GEM
     nokogiri (1.19.2)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
-    power_assert (2.0.2)
+    power_assert (3.0.1)
     prism (1.9.0)
     pry (0.16.0)
       coderay (~> 1.1)
@@ -127,7 +127,7 @@ GEM
       rack-protection (= 4.2.1)
       rack-session (>= 2.0.0, < 3)
       tilt (~> 2.0)
-    test-unit (3.5.7)
+    test-unit (3.7.7)
       power_assert
     thor (1.5.0)
     tilt (2.6.1)
