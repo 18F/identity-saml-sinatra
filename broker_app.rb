@@ -398,25 +398,32 @@ class HeadlessBroker < Sinatra::Base
         }
       end
 
+      SamlIdp.configure do |config|
+        config.x509_certificate = -> { saml_sp_certificate }
+        config.secret_key = -> { saml_sp_private_key }
+        config.algorithm = :sha256
+      end
+
       SamlIdp::SamlResponse.new(
-        reference_id: SecureRandom.uuid,
-        response_id: SecureRandom.uuid,
-        issuer_uri: aws_idp_entity_id,
-        principal: principal,
-        audience_uri: aws_audience_uri,
-        saml_request_id: nil,
-        saml_acs_url: aws_signin_url,
-        algorithm: :sha256,
-        authn_context_classref: 'http://idmanagement.gov/ns/assurance/aal/1',
-        public_cert: saml_sp_certificate,
-        private_key: saml_sp_private_key,
-        pv_key_password: nil,
-        signed_message_opts: true,
-        signed_assertion_opts: true,
-        asserted_attributes_opts: asserted_attributes,
-        name_id_formats_opts: {
+        SecureRandom.uuid,
+        SecureRandom.uuid,
+        aws_idp_entity_id,
+        principal,
+        aws_audience_uri,
+        nil,
+        aws_signin_url,
+        :sha256,
+        'http://idmanagement.gov/ns/assurance/aal/1',
+        60 * 60,
+        nil,
+        0,
+        {
           persistent: ->(p) { p.name_id },
-        }
+        },
+        asserted_attributes,
+        true,
+        true,
+        false
       ).build
     end
 

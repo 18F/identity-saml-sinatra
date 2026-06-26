@@ -2,7 +2,7 @@
 # Key users by a Login.gov identifier. By default lookup order is:
 # email, uuid, name_id (configure with BROKER_USER_MAP_KEYS).
 users:
-  user.one@example.gov:
+  gerardo.cruz-ortiz@gsa.gov:
     aws_role: reader
     role_session_name: user-one
     session_duration: 3600
