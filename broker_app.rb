@@ -11,6 +11,9 @@ require 'ostruct'
 require 'uri'
 require 'yaml'
 require 'cgi'
+require 'net/http'
+require 'rexml/document'
+require 'rexml/xpath'
 
 class HeadlessBroker < Sinatra::Base
   use Rack::Session::Cookie, key: 'headless_broker', secret: SecureRandom.hex(32)
@@ -89,6 +92,57 @@ class HeadlessBroker < Sinatra::Base
 
     def broker_public_url
       ENV.fetch('BROKER_PUBLIC_URL', request.base_url)
+    end
+
+    def broker_idp_metadata_url
+      ENV.fetch('BROKER_IDP_METADATA_URL', '')
+    end
+
+    def broker_idp_metadata_cache_seconds
+      Integer(ENV.fetch('BROKER_IDP_METADATA_CACHE_SECONDS', '300'))
+    rescue ArgumentError
+      300
+    end
+
+    def broker_idp_cert
+      ENV.fetch('BROKER_IDP_CERT', '')
+    end
+
+    def metadata_xml(url)
+      uri = URI.parse(url)
+      raise 'BROKER_IDP_METADATA_URL must be https' unless uri.scheme == 'https'
+
+      Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 5, read_timeout: 5) do |http|
+        request = Net::HTTP::Get.new(uri)
+        request['Accept'] = 'application/xml,text/xml'
+        response = http.request(request)
+        raise "metadata fetch failed: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+
+        response.body
+      end
+    end
+
+    def cert_from_metadata_xml(xml)
+      doc = REXML::Document.new(xml)
+      cert_node = REXML::XPath.first(doc, "//*[local-name()='X509Certificate']")
+      cert_text = cert_node&.text&.gsub(/\s+/, '')
+      return nil if cert_text.nil? || cert_text.empty?
+
+      "-----BEGIN CERTIFICATE-----\n#{cert_text.scan(/.{1,64}/).join("\n")}\n-----END CERTIFICATE-----\n"
+    end
+
+    def broker_idp_cert_from_metadata
+      return @broker_idp_cert_from_metadata if defined?(@broker_idp_cert_from_metadata) && @broker_idp_cert_from_metadata_expires_at && Time.now < @broker_idp_cert_from_metadata_expires_at
+
+      return nil if broker_idp_metadata_url.empty?
+
+      xml = metadata_xml(broker_idp_metadata_url)
+      cert = cert_from_metadata_xml(xml)
+      @broker_idp_cert_from_metadata = cert
+      @broker_idp_cert_from_metadata_expires_at = Time.now + broker_idp_metadata_cache_seconds
+      cert
+    rescue StandardError
+      nil
     end
 
     def metadata_sso_location
@@ -388,6 +442,18 @@ class HeadlessBroker < Sinatra::Base
       base_config.certificate = saml_sp_certificate
       base_config.private_key = saml_sp_private_key
 
+      dynamic_idp_cert = if !broker_idp_cert.empty?
+        broker_idp_cert
+      else
+        broker_idp_cert_from_metadata
+      end
+
+      unless dynamic_idp_cert.nil? || dynamic_idp_cert.empty?
+        base_config.idp_cert = dynamic_idp_cert
+        base_config.delete('idp_cert_fingerprint')
+        base_config.delete('idp_cert_fingerprint_algorithm')
+      end
+
       OneLogin::RubySaml::Settings.new(base_config)
     end
 
@@ -531,6 +597,17 @@ class HeadlessBroker < Sinatra::Base
         attributes: response.attributes.to_h,
         note: 'BROKER_OUTPUT_MODE=aws_broker_assertion mints a broker-signed AWS-compatible assertion. BROKER_OUTPUT_MODE=aws_post forwards Login.gov assertion as-is.',
       }
+    )
+  rescue OpenSSL::PKey::RSAError, OpenSSL::PKey::PKeyError => e
+    json(
+      {
+        ok: false,
+        phase: 'acs',
+        error: 'saml_assertion_decryption_failed',
+        message: 'Unable to decrypt Login.gov SAML assertion. Verify BROKER_SP_PRIVATE_KEY matches the certificate registered for this SP in the Login.gov partner portal.',
+        details: e.message,
+      },
+      status_code: 400
     )
   rescue KeyError
     json({ ok: false, error: 'missing SAMLResponse' }, status_code: 400)
