@@ -1,0 +1,42 @@
+applications:
+  - name: identity-saml-broker
+    memory: 256M
+    instances: 1
+    buildpacks:
+      - ruby_buildpack
+    command: bundle exec rackup config.ru -p $PORT -o 0.0.0.0
+    env:
+      APP_MODE: broker
+      RACK_ENV: production
+
+      # Broker SP configuration
+      BROKER_ASSERTION_CONSUMER_SERVICE_URL: https://identity-saml-broker.app.cloud.gov/acs
+      BROKER_ISSUER: urn:gov:gsa:SAML:2.0.profiles:sp:sso:login-gov:aws-quicksight-broker
+      BROKER_IDP_SSO_TARGET_URL: https://idp.int.identitysandbox.gov/api/saml/auth2026
+      BROKER_IDP_SLO_TARGET_URL: https://idp.int.identitysandbox.gov/api/saml/logout2026
+      BROKER_IDP_CERT_FINGERPRINT: replace-me
+      BROKER_IDP_CERT_FINGERPRINT_ALGORITHM: http://www.w3.org/2000/09/xmldsig#sha1
+
+      # Use a long random value.
+      BROKER_STATE_SECRET: replace-me
+
+      # Headless behavior
+      BROKER_OUTPUT_MODE: aws_broker_assertion
+      AWS_SIGNIN_URL: https://signin.aws.amazon.com/saml
+
+      # AWS assertion attributes
+      BROKER_AWS_ROLE_ARN: arn:aws:iam::123456789012:role/quicksight_login_gov_reader
+      # BROKER_AWS_ROLE_ARNS_JSON: '{"reader":"arn:aws:iam::123456789012:role/quicksight_login_gov_reader","author":"arn:aws:iam::123456789012:role/quicksight_login_gov_author"}'
+      BROKER_AWS_SAML_PROVIDER_ARN: arn:aws:iam::123456789012:saml-provider/quicksight-login-gov-broker
+      BROKER_AWS_IDP_ENTITY_ID: urn:gov:gsa:SAML:2.0.profiles:sp:sso:login-gov:aws-quicksight-broker
+      BROKER_AWS_AUDIENCE: urn:amazon:webservices
+
+      # Optional YAML user map authorization.
+      BROKER_USER_MAP_FILE: config/user_map.yml
+      # BROKER_USER_MAP_KEYS: email,uuid,name_id
+
+      # Optional fixed QuickSight destination if upstream RelayState is absent.
+      # BROKER_DEFAULT_RELAY_STATE: https://us-east-1.quicksight.aws.amazon.com/sn/start
+
+      # Optional relay-state allowlist.
+      # BROKER_RELAY_STATE_ALLOWLIST_PREFIXES: https://us-east-1.quicksight.aws.amazon.com/

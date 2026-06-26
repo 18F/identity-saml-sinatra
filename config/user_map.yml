@@ -1,0 +1,23 @@
+---
+# Key users by a Login.gov identifier. By default lookup order is:
+# email, uuid, name_id (configure with BROKER_USER_MAP_KEYS).
+users:
+  user.one@example.gov:
+    aws_role: reader
+    role_session_name: user-one
+    session_duration: 3600
+    quicksight_groups:
+      - reader-group
+      - team-data
+
+  user.two@example.gov:
+    aws_role: author
+    quicksight_groups:
+      - author-group
+
+# Optional fallback mapping. If omitted and a user is not mapped,
+# broker returns 403 when BROKER_USER_MAP_FILE is configured.
+default:
+  aws_role: reader
+  quicksight_groups:
+    - default-reader

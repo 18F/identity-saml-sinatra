@@ -1,0 +1,16 @@
+---
+assertion_consumer_service_url: <%= ENV['BROKER_ASSERTION_CONSUMER_SERVICE_URL'] %>
+issuer: <%= ENV['BROKER_ISSUER'] %>
+idp_sso_target_url: <%= ENV['BROKER_IDP_SSO_TARGET_URL'] %>
+idp_slo_target_url: <%= ENV['BROKER_IDP_SLO_TARGET_URL'] %>
+idp_cert_fingerprint: <%= ENV['BROKER_IDP_CERT_FINGERPRINT'] %>
+
+idp_cert_fingerprint_algorithm: <%= ENV.fetch('BROKER_IDP_CERT_FINGERPRINT_ALGORITHM', 'http://www.w3.org/2000/09/xmldsig#sha1') %>
+assertion_consumer_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+name_identifier_format: urn:oasis:names:tc:SAML:2.0:nameid-format:persistent
+single_signon_service_binding: urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST
+allowed_clock_drift: 60
+security:
+  authn_requests_signed: true
+  digest_method: http://www.w3.org/2001/04/xmlenc#sha256
+  signature_method: http://www.w3.org/2001/04/xmldsig-more#rsa-sha256
