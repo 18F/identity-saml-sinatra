@@ -3,6 +3,66 @@
 This repository now includes a minimal headless broker mode that can sit between
 an SP initiation source and Login.gov.
 
+## Authentication Flow
+
+```mermaid
+sequenceDiagram
+   autonumber
+   participant U as User
+   participant QS as QuickSight
+   participant B as Headless Broker
+   participant LG as Login.gov
+   participant YM as YAML User Map
+   participant AWS as AWS Sign-in
+   participant STS as AWS STS/IAM
+   participant QSA as QuickSight App
+
+   U->>QS: Open QuickSight sign-in
+   QS->>B: Redirect to IdP URL (/)
+   B->>LG: SP-initiated AuthnRequest (SAMLRequest + RelayState)
+   LG->>U: Authenticate user (MFA, etc.)
+   LG->>B: POST SAMLResponse to /acs
+
+   B->>B: Validate Login.gov SAMLResponse
+   B->>YM: Lookup user by email/uuid/name_id
+   alt User mapped (or default exists)
+      YM-->>B: aws_role + quicksight_groups
+      B->>B: Resolve aws_role -> role ARN (env map)
+      B->>B: Mint AWS-compatible SAMLResponse
+      Note right of B: Includes Role, RoleSessionName,<br/>PrincipalTag:QuickSightGroups
+      B->>AWS: Auto-POST broker-signed SAMLResponse
+      AWS->>STS: AssumeRoleWithSAML
+      STS-->>AWS: Federated session
+      AWS-->>QSA: Redirect with session
+      QSA-->>U: Logged into QuickSight
+   else User not mapped and no default
+      YM-->>B: No match
+      B-->>U: 403 Unauthorized
+   end
+```
+
+### Linear Flow View
+
+```mermaid
+flowchart LR
+   A[User opens QuickSight sign-in] --> B[QuickSight redirects to Broker IdP URL]
+   B --> C[Broker sends SAML AuthnRequest to Login.gov]
+   C --> D[User authenticates at Login.gov]
+   D --> E[Login.gov POSTs SAMLResponse to Broker /acs]
+   E --> F[Broker validates Login.gov assertion]
+   F --> G[Broker looks up user in YAML map]
+   G --> H{Mapped user or default?}
+   H -->|No| I[Return 403 Unauthorized]
+   H -->|Yes| J[Resolve aws_role to role ARN from env map]
+   J --> K[Mint AWS-compatible SAMLResponse]
+   K --> L[Include Role, RoleSessionName, PrincipalTag QuickSightGroups]
+   L --> M[Auto-POST response to AWS sign-in]
+   M --> N[AWS STS AssumeRoleWithSAML]
+   N --> O[AWS federated session created]
+   O --> P[Redirect to QuickSight app]
+   P --> Q[User lands in QuickSight]
+```
+
 ## What It Does
 
 - `GET /`
