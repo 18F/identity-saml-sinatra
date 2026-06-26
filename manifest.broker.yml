@@ -19,6 +19,7 @@ applications:
 
       # Use a long random value.
       BROKER_STATE_SECRET: replace-me
+      BROKER_PUBLIC_URL: https://identity-saml-broker.app.cloud.gov
 
       # Headless behavior
       BROKER_OUTPUT_MODE: aws_broker_assertion

@@ -10,6 +10,7 @@ require 'sinatra/base'
 require 'ostruct'
 require 'uri'
 require 'yaml'
+require 'cgi'
 
 class HeadlessBroker < Sinatra::Base
   use Rack::Session::Cookie, key: 'headless_broker', secret: SecureRandom.hex(32)
@@ -84,6 +85,49 @@ class HeadlessBroker < Sinatra::Base
 
     def aws_idp_entity_id
       ENV.fetch('BROKER_AWS_IDP_ENTITY_ID', ENV.fetch('BROKER_ISSUER'))
+    end
+
+    def broker_public_url
+      ENV.fetch('BROKER_PUBLIC_URL', request.base_url)
+    end
+
+    def metadata_sso_location
+      "#{broker_public_url}/"
+    end
+
+    def metadata_slo_location
+      "#{broker_public_url}/slo_logout"
+    end
+
+    def saml_sp_certificate_base64
+      saml_sp_certificate
+        .gsub('-----BEGIN CERTIFICATE-----', '')
+        .gsub('-----END CERTIFICATE-----', '')
+        .gsub(/\s+/, '')
+    end
+
+    def broker_metadata_xml
+      entity_id = CGI.escapeHTML(aws_idp_entity_id)
+      cert = CGI.escapeHTML(saml_sp_certificate_base64)
+      sso_location = CGI.escapeHTML(metadata_sso_location)
+      slo_location = CGI.escapeHTML(metadata_slo_location)
+
+      <<~XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="#{entity_id}">
+          <IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" WantAuthnRequestsSigned="false">
+            <KeyDescriptor use="signing">
+              <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                <ds:X509Data>
+                  <ds:X509Certificate>#{cert}</ds:X509Certificate>
+                </ds:X509Data>
+              </ds:KeyInfo>
+            </KeyDescriptor>
+            <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="#{sso_location}"/>
+            <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="#{slo_location}"/>
+          </IDPSSODescriptor>
+        </EntityDescriptor>
+      XML
     end
 
     def aws_audience_uri
@@ -378,6 +422,11 @@ class HeadlessBroker < Sinatra::Base
 
   get '/health' do
     json({ ok: true, service: 'headless-login-gov-broker' })
+  end
+
+  get '/metadata' do
+    content_type 'application/samlmetadata+xml'
+    broker_metadata_xml
   end
 
   get '/' do

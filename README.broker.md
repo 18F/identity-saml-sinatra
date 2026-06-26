@@ -89,6 +89,8 @@ flowchart LR
 
 - Configure QuickSight IdP URL to your broker root URL, for example:
    - `https://<your-app>.app.cloud.gov/`
+- Broker metadata endpoint for AWS IAM SAML provider:
+   - `https://<your-app>.app.cloud.gov/metadata`
 - The broker immediately redirects to Login.gov.
 - After Login.gov posts back to `/acs`, broker auto-posts to AWS sign-in.
 - Set `BROKER_DEFAULT_RELAY_STATE` if you want a deterministic QuickSight destination.
