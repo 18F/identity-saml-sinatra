@@ -53,6 +53,10 @@ class HeadlessBroker < Sinatra::Base
       ENV.fetch('AWS_SIGNIN_URL', 'https://signin.aws.amazon.com/saml')
     end
 
+    def aws_saml_recipient_url
+      ENV.fetch('BROKER_AWS_RECIPIENT_URL', 'https://signin.aws.amazon.com/saml')
+    end
+
     def aws_saml_provider_arn
       ENV.fetch('BROKER_AWS_SAML_PROVIDER_ARN')
     end
@@ -413,7 +417,7 @@ class HeadlessBroker < Sinatra::Base
         principal,
         aws_audience_uri,
         nil,
-        aws_signin_url,
+        aws_saml_recipient_url,
         :sha256,
         'http://idmanagement.gov/ns/assurance/aal/1',
         60 * 60,
