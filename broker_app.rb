@@ -289,6 +289,8 @@ class HeadlessBroker < Sinatra::Base
       session_duration = resolved_session_duration(authz)
       role_pair_value = "#{authz[:aws_role_arn]},#{authz[:aws_saml_provider_arn]}"
       quicksight_groups = normalized_quicksight_groups(authz)
+      login_email = first_attr_value(login_gov_response, 'email')
+      tag_keys = []
 
       principal = OpenStruct.new(
         name_id: role_session_name,
@@ -296,7 +298,8 @@ class HeadlessBroker < Sinatra::Base
         role_session_name: role_session_name,
         session_duration: session_duration,
         quicksight_groups_tag: quicksight_groups.join(','),
-        transitive_tag_keys: 'QuickSightGroups'
+        email_tag: login_email,
+        transitive_tag_keys: nil
       )
 
       asserted_attributes = {
@@ -317,11 +320,24 @@ class HeadlessBroker < Sinatra::Base
         }
       end
 
+      unless login_email.to_s.empty?
+        asserted_attributes[:principal_tag_email] = {
+          name: 'https://aws.amazon.com/SAML/Attributes/PrincipalTag:Email',
+          getter: :email_tag,
+        }
+        tag_keys << 'Email'
+      end
+
       unless quicksight_groups.empty?
         asserted_attributes[:principal_tag_quicksight_groups] = {
           name: 'https://aws.amazon.com/SAML/Attributes/PrincipalTag:QuickSightGroups',
           getter: :quicksight_groups_tag,
         }
+        tag_keys << 'QuickSightGroups'
+      end
+
+      unless tag_keys.empty?
+        principal.transitive_tag_keys = tag_keys.join(',')
         asserted_attributes[:transitive_tag_keys] = {
           name: 'https://aws.amazon.com/SAML/Attributes/TransitiveTagKeys',
           getter: :transitive_tag_keys,
