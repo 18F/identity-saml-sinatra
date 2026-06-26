@@ -35,7 +35,7 @@ applications:
       BROKER_AWS_ROLE_ARNS_JSON: '{"reader":"arn:aws:iam::121551302552:role/QuickSightBrokerReaderRole","author":"arn:aws:iam::121551302552:role/QuickSightBrokerAuthorRole","admin":"arn:aws:iam::121551302552:role/QuickSightBrokerAdminRole"}'
       BROKER_AWS_SAML_PROVIDER_ARN: arn:aws:iam::121551302552:saml-provider/quicksight-broker
       BROKER_AWS_IDP_ENTITY_ID: urn:gov:gsa:SAML:2.0.profiles:sp:sso:login-gov:aws-quicksight-broker
-      BROKER_AWS_AUDIENCE: urn:amazon:webservices
+      BROKER_AWS_AUDIENCE: https://signin.aws.amazon.com/saml
 
       # Optional YAML user map authorization.
       BROKER_USER_MAP_FILE: config/user_map.yml

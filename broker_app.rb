@@ -185,7 +185,7 @@ class HeadlessBroker < Sinatra::Base
     end
 
     def aws_audience_uri
-      ENV.fetch('BROKER_AWS_AUDIENCE', 'urn:amazon:webservices')
+      ENV.fetch('BROKER_AWS_AUDIENCE', 'https://signin.aws.amazon.com/saml')
     end
 
     def aws_role_pair_value
@@ -342,13 +342,15 @@ class HeadlessBroker < Sinatra::Base
       role_session_name = role_session_name_for(login_gov_response, authz)
       session_duration = resolved_session_duration(authz)
       role_pair_value = "#{authz[:aws_role_arn]},#{authz[:aws_saml_provider_arn]}"
+      legacy_role_pair_value = "#{authz[:aws_saml_provider_arn]},#{authz[:aws_role_arn]}"
       quicksight_groups = normalized_quicksight_groups(authz)
       login_email = first_attr_value(login_gov_response, 'email')
       tag_keys = []
 
       principal = OpenStruct.new(
         name_id: role_session_name,
-        role: role_pair_value,
+        # Some AWS federation paths still rely on legacy principal,role ordering.
+        role: [role_pair_value, legacy_role_pair_value].uniq,
         role_session_name: role_session_name,
         session_duration: session_duration,
         quicksight_groups_tag: quicksight_groups.join(','),
