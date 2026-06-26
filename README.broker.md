@@ -7,29 +7,27 @@ an SP initiation source and Login.gov.
 
 ```mermaid
 sequenceDiagram
-   autonumber
    participant U as User
    participant QS as QuickSight
-   participant B as Headless Broker
-   participant LG as Login.gov
-   participant YM as YAML User Map
-   participant AWS as AWS Sign-in
-   participant STS as AWS STS/IAM
+   participant B as Broker
+   participant LG as LoginGov
+   participant YM as UserMap
+   participant AWS as AWSSignIn
+   participant STS as AWSSTS
    participant QSA as QuickSight App
 
    U->>QS: Open QuickSight sign-in
-   QS->>B: Redirect to IdP URL (/)
-   B->>LG: SP-initiated AuthnRequest (SAMLRequest + RelayState)
-   LG->>U: Authenticate user (MFA, etc.)
+   QS->>B: Redirect to IdP URL
+   B->>LG: SP initiated AuthnRequest
+   LG->>U: Authenticate user
    LG->>B: POST SAMLResponse to /acs
 
-   B->>B: Validate Login.gov SAMLResponse
+   B->>B: Validate LoginGov SAMLResponse
    B->>YM: Lookup user by email/uuid/name_id
-   alt User mapped (or default exists)
+   alt User mapped or default exists
       YM-->>B: aws_role + quicksight_groups
-      B->>B: Resolve aws_role -> role ARN (env map)
-      B->>B: Mint AWS-compatible SAMLResponse
-      Note right of B: Includes Role, RoleSessionName,<br/>PrincipalTag:QuickSightGroups
+      B->>B: Resolve role ARN from env map
+      B->>B: Mint AWS compatible SAMLResponse
       B->>AWS: Auto-POST broker-signed SAMLResponse
       AWS->>STS: AssumeRoleWithSAML
       STS-->>AWS: Federated session
@@ -44,18 +42,18 @@ sequenceDiagram
 ### Linear Flow View
 
 ```mermaid
-flowchart LR
+graph LR
    A[User opens QuickSight sign-in] --> B[QuickSight redirects to Broker IdP URL]
-   B --> C[Broker sends SAML AuthnRequest to Login.gov]
-   C --> D[User authenticates at Login.gov]
+   B --> C[Broker sends SAML AuthnRequest to LoginGov]
+   C --> D[User authenticates at LoginGov]
    D --> E[Login.gov POSTs SAMLResponse to Broker /acs]
    E --> F[Broker validates Login.gov assertion]
    F --> G[Broker looks up user in YAML map]
-   G --> H{Mapped user or default?}
+   G --> H{Mapped user or default}
    H -->|No| I[Return 403 Unauthorized]
-   H -->|Yes| J[Resolve aws_role to role ARN from env map]
-   J --> K[Mint AWS-compatible SAMLResponse]
-   K --> L[Include Role, RoleSessionName, PrincipalTag QuickSightGroups]
+   H -->|Yes| J[Resolve aws_role to role ARN]
+   J --> K[Mint AWS compatible SAMLResponse]
+   K --> L[Include Role and PrincipalTag QuickSightGroups]
    L --> M[Auto-POST response to AWS sign-in]
    M --> N[AWS STS AssumeRoleWithSAML]
    N --> O[AWS federated session created]
