@@ -308,6 +308,10 @@ class HeadlessBroker < Sinatra::Base
       bounded.empty? ? 'broker-session' : bounded
     end
 
+    def email_local_part(value)
+      value.to_s.split('@', 2).first
+    end
+
     def role_session_name_for(login_gov_response, authz)
       mapped_name = authz[:role_session_name]
       return normalized_session_name(mapped_name) unless mapped_name.to_s.empty?
@@ -320,8 +324,11 @@ class HeadlessBroker < Sinatra::Base
         return normalized_session_name(login_gov_response.name_id)
       end
 
-      email = login_gov_response.attributes['email']
-      normalized_session_name(email || login_gov_response.name_id)
+      email = first_attr_value(login_gov_response, 'email')
+      derived_value = email_local_part(email)
+      derived_value = login_gov_response.name_id if derived_value.to_s.empty?
+
+      normalized_session_name(derived_value)
     end
 
     def aws_session_duration
@@ -346,15 +353,13 @@ class HeadlessBroker < Sinatra::Base
       role_session_name = role_session_name_for(login_gov_response, authz)
       session_duration = resolved_session_duration(authz)
       role_pair_value = "#{authz[:aws_role_arn]},#{authz[:aws_saml_provider_arn]}"
-      legacy_role_pair_value = "#{authz[:aws_saml_provider_arn]},#{authz[:aws_role_arn]}"
       quicksight_groups = normalized_quicksight_groups(authz)
       login_email = first_attr_value(login_gov_response, 'email')
       tag_keys = []
 
       principal = OpenStruct.new(
         name_id: role_session_name,
-        # Some AWS federation paths still rely on legacy principal,role ordering.
-        role: [role_pair_value, legacy_role_pair_value].uniq,
+        role: role_pair_value,
         role_session_name: role_session_name,
         session_duration: session_duration,
         quicksight_groups_tag: quicksight_groups.join(','),
@@ -397,7 +402,8 @@ class HeadlessBroker < Sinatra::Base
       end
 
       unless tag_keys.empty?
-        principal.transitive_tag_keys = tag_keys.join(',')
+        # AWS expects one AttributeValue per transitive tag key.
+        principal.transitive_tag_keys = tag_keys
         asserted_attributes[:transitive_tag_keys] = {
           name: 'https://aws.amazon.com/SAML/Attributes/TransitiveTagKeys',
           getter: :transitive_tag_keys,
@@ -513,6 +519,47 @@ class HeadlessBroker < Sinatra::Base
       status status_code
       JSON.pretty_generate(body)
     end
+
+    def assertion_diagnostics_enabled?
+      ENV.fetch('BROKER_LOG_ASSERTION_DIAGNOSTICS', 'false') == 'true'
+    end
+
+    def role_values_from_assertion_xml(xml)
+      role_nodes = REXML::XPath.match(
+        xml,
+        "//*[local-name()='Attribute' and @Name='https://aws.amazon.com/SAML/Attributes/Role']/*[local-name()='AttributeValue']"
+      )
+      role_nodes.map(&:text).compact
+    end
+
+    def assertion_diagnostics(encoded_assertion)
+      xml = Base64.decode64(encoded_assertion.to_s)
+      doc = REXML::Document.new(xml)
+
+      issuer = REXML::XPath.first(doc, "//*[local-name()='Issuer']")&.text
+      audience = REXML::XPath.first(doc, "//*[local-name()='Audience']")&.text
+      recipient = REXML::XPath.first(doc, "//*[local-name()='SubjectConfirmationData']")&.attributes&.[]('Recipient')
+
+      {
+        event: 'broker_assertion_diagnostics',
+        issuer: issuer,
+        audience: audience,
+        recipient: recipient,
+        role_values: role_values_from_assertion_xml(doc),
+      }
+    rescue StandardError => e
+      {
+        event: 'broker_assertion_diagnostics_error',
+        error: e.class.name,
+        message: e.message,
+      }
+    end
+
+    def log_assertion_diagnostics(encoded_assertion)
+      return unless assertion_diagnostics_enabled?
+
+      puts(assertion_diagnostics(encoded_assertion).to_json)
+    end
   end
 
   get '/health' do
@@ -567,6 +614,7 @@ class HeadlessBroker < Sinatra::Base
       end
 
       aws_response = build_aws_saml_response(response, authz)
+      log_assertion_diagnostics(aws_response)
       relay_html = final_relay_state ? "<input type=\"hidden\" name=\"RelayState\" value=\"#{Rack::Utils.escape_html(final_relay_state)}\">" : ''
 
       return <<~HTML

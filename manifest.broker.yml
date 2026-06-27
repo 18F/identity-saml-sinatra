@@ -28,7 +28,7 @@ applications:
 
       # Headless behavior
       BROKER_OUTPUT_MODE: aws_broker_assertion
-      AWS_SIGNIN_URL: https://signin.aws.amazon.com/saml/acs/SAMLSP9EGPBZQI0UI7HK0G
+      AWS_SIGNIN_URL: https://signin.aws.amazon.com/saml
 
       # AWS assertion attributes
       # BROKER_AWS_ROLE_ARN: arn:aws:iam::123456789012:role/quicksight_login_gov_reader
@@ -42,7 +42,10 @@ applications:
       # BROKER_USER_MAP_KEYS: email,uuid,name_id
 
       # Optional fixed QuickSight destination if upstream RelayState is absent.
-      # BROKER_DEFAULT_RELAY_STATE: https://us-east-1.quicksight.aws.amazon.com/sn/start
+      BROKER_DEFAULT_RELAY_STATE: https://us-west-2.quicksight.aws.amazon.com/sn/start
 
       # Optional relay-state allowlist.
-      # BROKER_RELAY_STATE_ALLOWLIST_PREFIXES: https://us-east-1.quicksight.aws.amazon.com/
+      BROKER_RELAY_STATE_ALLOWLIST_PREFIXES: https://us-west-2.quicksight.aws.amazon.com/
+
+      # Optional temporary SAML diagnostics in app logs (issuer/audience/recipient/role values).
+      BROKER_LOG_ASSERTION_DIAGNOSTICS: true
