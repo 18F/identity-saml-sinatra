@@ -24,3 +24,18 @@ users:
       - team-data
     quicksight_namespaces:
       - delivery
+
+  samatha.dondeti@gsa.gov:
+    aws_role: author    
+    quicksight_groups:
+      - team-data
+
+  noor.mahmud@gsa.gov:
+    aws_role: author    
+    quicksight_groups:
+      - team-data
+
+  akhlaq.khan@gsa.gov: 
+    aws_role: author    
+    quicksight_groups:
+      - team-data
