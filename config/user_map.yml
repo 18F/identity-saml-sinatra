@@ -3,21 +3,24 @@
 # email, uuid, name_id (configure with BROKER_USER_MAP_KEYS).
 users:
   gerardo.cruz-ortiz@gsa.gov:
-    aws_role: reader
-    role_session_name: user-one
+    aws_role: reader    
     session_duration: 3600
     quicksight_groups:
-      - reader-group
       - team-data
+    quicksight_namespaces:
+      - fraud-ops
+      - delivery
 
-  user.two@example.gov:
+  ambuj.neupane+qs@gsa.gov:
     aws_role: author
     quicksight_groups:
-      - author-group
+      - team-data
+    quicksight_namespaces:
+      - fraud-ops
 
-# Optional fallback mapping. If omitted and a user is not mapped,
-# broker returns 403 when BROKER_USER_MAP_FILE is configured.
-default:
-  aws_role: reader
-  quicksight_groups:
-    - default-reader
+  basilio.bogado@gsa.gov:
+    aws_role: author
+    quicksight_groups:
+      - team-data
+    quicksight_namespaces:
+      - delivery
