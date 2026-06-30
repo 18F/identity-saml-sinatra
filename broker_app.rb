@@ -275,6 +275,23 @@ class HeadlessBroker < Sinatra::Base
       role_session_name = entry.fetch('role_session_name', default_entry['role_session_name'])
       session_duration = entry.fetch('session_duration', default_entry['session_duration'])
       quicksight_groups = entry.fetch('quicksight_groups', default_entry['quicksight_groups'])
+      quicksight_namespaces = entry.fetch('quicksight_namespaces', default_entry['quicksight_namespaces'])
+      quicksight_namespace = entry.fetch('quicksight_namespace', default_entry['quicksight_namespace'])
+
+      # Prefer explicit single namespace, then first namespace from list.
+      selected_quicksight_namespace = quicksight_namespace.to_s.strip
+      if selected_quicksight_namespace.empty?
+        selected_quicksight_namespace = Array(quicksight_namespaces).map(&:to_s).map(&:strip).reject(&:empty?).first.to_s
+      end
+
+      if selected_quicksight_namespace.empty?
+        return {
+          authorized: false,
+          reason: 'missing_quicksight_namespace',
+          matched_by: matched_by,
+          matched_value: matched_value,
+        }
+      end
 
       if role_arn.nil? || provider_arn.nil?
         return {
@@ -295,6 +312,7 @@ class HeadlessBroker < Sinatra::Base
         role_session_name: role_session_name,
         session_duration: session_duration,
         quicksight_groups: quicksight_groups,
+        quicksight_namespace: selected_quicksight_namespace,
       }
     end
 
@@ -354,6 +372,7 @@ class HeadlessBroker < Sinatra::Base
       session_duration = resolved_session_duration(authz)
       role_pair_value = "#{authz[:aws_role_arn]},#{authz[:aws_saml_provider_arn]}"
       quicksight_groups = normalized_quicksight_groups(authz)
+      quicksight_namespace = authz[:quicksight_namespace].to_s.strip
       login_email = first_attr_value(login_gov_response, 'email')
       tag_keys = []
 
@@ -363,6 +382,7 @@ class HeadlessBroker < Sinatra::Base
         role_session_name: role_session_name,
         session_duration: session_duration,
         quicksight_groups_tag: quicksight_groups.join(','),
+        quicksight_namespace_tag: quicksight_namespace,
         email_tag: login_email,
         transitive_tag_keys: nil
       )
@@ -399,6 +419,14 @@ class HeadlessBroker < Sinatra::Base
           getter: :quicksight_groups_tag,
         }
         tag_keys << 'QuickSightGroups'
+      end
+
+      unless quicksight_namespace.empty?
+        asserted_attributes[:principal_tag_quicksight_namespaces] = {
+          name: 'https://aws.amazon.com/SAML/Attributes/PrincipalTag:QuickSightNamespaces',
+          getter: :quicksight_namespace_tag,
+        }
+        tag_keys << 'QuickSightNamespaces'
       end
 
       unless tag_keys.empty?
@@ -524,12 +552,12 @@ class HeadlessBroker < Sinatra::Base
       ENV.fetch('BROKER_LOG_ASSERTION_DIAGNOSTICS', 'false') == 'true'
     end
 
-    def role_values_from_assertion_xml(xml)
-      role_nodes = REXML::XPath.match(
+    def assertion_attribute_values(xml, attribute_name)
+      nodes = REXML::XPath.match(
         xml,
-        "//*[local-name()='Attribute' and @Name='https://aws.amazon.com/SAML/Attributes/Role']/*[local-name()='AttributeValue']"
+        "//*[local-name()='Attribute' and @Name='#{attribute_name}']/*[local-name()='AttributeValue']"
       )
-      role_nodes.map(&:text).compact
+      nodes.map(&:text).compact
     end
 
     def assertion_diagnostics(encoded_assertion)
@@ -545,7 +573,10 @@ class HeadlessBroker < Sinatra::Base
         issuer: issuer,
         audience: audience,
         recipient: recipient,
-        role_values: role_values_from_assertion_xml(doc),
+        role_values: assertion_attribute_values(doc, 'https://aws.amazon.com/SAML/Attributes/Role'),
+        quicksight_group_values: assertion_attribute_values(doc, 'https://aws.amazon.com/SAML/Attributes/PrincipalTag:QuickSightGroups'),
+        quicksight_namespace_values: assertion_attribute_values(doc, 'https://aws.amazon.com/SAML/Attributes/PrincipalTag:QuickSightNamespaces'),
+        transitive_tag_keys_values: assertion_attribute_values(doc, 'https://aws.amazon.com/SAML/Attributes/TransitiveTagKeys'),
       }
     rescue StandardError => e
       {
