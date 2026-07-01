@@ -9,8 +9,7 @@
   },
   "dependencies": {
     "@18f/identity-build-sass": "^3.1.0",
-    "@18f/identity-design-system": "^9.4.0",
-    "uswds": "^2.13.3"
+    "@18f/identity-design-system": "^9.4.0"
   },
   "devDependencies": {
     "jsdom": "^25.0.1",
