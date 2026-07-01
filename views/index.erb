@@ -11,15 +11,15 @@
   <% if logout_msg %>
     <div class="clearfix">
       <div class="col-12 sm-col-6 mx-auto">
-      <% if logout_msg == 'ok' %>
-        <div class="h5 p1 bg-green white center">
-          <span class="bold caps">You have been logged out.</span>
-        </div>
-      <% else %>
-        <div class="h5 p1 bg-red white center">
-          <span class="bold caps">Logout failed!</span>
-        </div>
-      <% end %>
+        <% if logout_msg == 'ok' %>
+          <div class="h5 p1 bg-green white center">
+            <span class="bold caps">You have been logged out.</span>
+          </div>
+        <% else %>
+          <div class="h5 p1 bg-red white center">
+            <span class="bold caps">Logout failed!</span>
+          </div>
+        <% end %>
       </div>
     </div>
   <% end %>
@@ -64,17 +64,18 @@
         </li>
       </ul>
       <div class="usa-nav__secondary">
-        <% if session[:email] %>
-          <div class="sign-in-wrap">
+        <div class="sign-in-wrap">
+          <% if session[:email] %>
+
             <div class="center p2"><%= session[:email] %></div>
             <div>
-            <form action="/logout" method="POST" class="center sm-show">
-              <button type="submit" class="p1 usa-button usa-button--outline">Log out</button>
-            </form>
+              <form action="/logout" method="POST" class="center sm-show">
+                <button type="submit" class="p1 usa-button usa-button--outline">Log out</button>
+              </form>
             </div>
-          </div>
-        <% else %>
-          <div class="sign-in-wrap">
+
+          <% else %>
+
             <form action="<%= login_path %>" method="GET" style="float:right" id="login-form">
               <div class="sign-in-wrap clearfix">
                 <button type="submit"  class="usa-button usa-button--outline sign-in-bttn">
@@ -166,6 +167,18 @@
                     <% end %>
                   </select>
 
+                  <div class="usa-checkbox">
+                    <input class="usa-checkbox__input"
+                         id="check-initiate_registration"
+                         type="checkbox"
+                         name="initiate_registration"
+                         value="true"
+                    >
+                    <label class="usa-checkbox__label padding-left-8" for="check-initiate_registration">
+                      Initiate User Registration
+                    </label>
+                  </div>
+
                   <script type="application/json" id="default-scopes">
                     <%= default_requested_attributes_by_ial.to_json %>
                   </script>
@@ -185,8 +198,9 @@
                 </details>
               </div>
             </form>
-          </div>
-        <% end %>
+
+          <% end %>
+        </div>
       </div>
     </div>
   </nav>
@@ -222,11 +236,11 @@
             <ul>
               <% userinfo.each_pair do |key, vals| %>
                 <li><code><%= key.inspect %>:
-                  <% vals.each do |val| %>
-                    <% val = maybe_redact_ssn(val) if key.to_s == 'ssn' %>
-                    <%= val.inspect %>
-                  <% end %>
-                </code></li>
+                    <% vals.each do |val| %>
+                      <% val = maybe_redact_ssn(val) if key.to_s == 'ssn' %>
+                      <%= val.inspect %>
+                    <% end %>
+                  </code></li>
               <% end %>
             </ul>
           </div>
@@ -300,7 +314,7 @@
             <h3 class="usa-footer__logo-heading">SAML Sinatra Example</h3>
             <a class="usa-footer__primary-link source-code-link" href="https://github.com/18F/identity-saml-sinatra">
               <div>
-                <img src="/assets/img/GitHub-Mark-120px-plus.png" alt="GitHub Logo" title="GitHub Logo" width=60/>
+                <img src="/assets/img/GitHub-Mark-120px-plus.png" alt="GitHub Logo" title="GitHub Logo" width="60">
                 <span>Get the Source Code</span>
               </div>
             </a>
