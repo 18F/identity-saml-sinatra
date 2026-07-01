@@ -1,36 +1,7 @@
-.sign-in-type-wrap {
-  margin-right: 25px;
-}
-.sign-in-wrap {
-  clear: both;
-}
-.sign-in-wrap form {
-  float: left;
-}
-.sign-in-bttn {
-  float: right;
-  margin: 5px;
-  min-width: 185px;
-}
-.sign-in-bttn svg {
-  margin-bottom: -2px;
-  margin-right: 3px;
-  height: 1rem;
-}
-
-.usa-nav__secondary {
-  padding-bottom: 10px;
-}
-
 .details-popup {
   position: absolute;
   margin-top: 5px;
   display: block;
-  right: 10px;
-}
-
-.details-popup summary {
-  text-align: right;
 }
 
 .details-popup[open] {

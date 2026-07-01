@@ -1,40 +1,51 @@
 .bg-maroon {
   background-color: #85144b;
 }
+
 .bg-navy {
-    background-color: #112e51;
+  background-color: #112e51;
 }
+
 .white {
-    color: #ffffff;
+  color: #ffffff;
 }
+
 .fs-12p {
-    font-size: 12px;
+  font-size: 12px;
 }
+
 .line-height-1 {
-    line-height: 1;
+  line-height: 1;
 }
+
 .center {
-    text-align: center;
+  text-align: center;
 }
+
 .mr1 {
-    margin-right: 0.5rem;
+  margin-right: 0.5rem;
 }
+
 .align-bottom {
-    vertical-align: bottom;
+  vertical-align: bottom;
 }
 
 .p0 {
   padding: 0;
 }
+
 .p1 {
   padding: 0.5rem;
 }
+
 .p2 {
   padding: 1rem;
 }
+
 .p3 {
   padding: 2rem;
 }
+
 .p4 {
   padding: 4rem;
 }
@@ -43,9 +54,11 @@
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
+
 .source-code-link img {
   float: left;
 }
+
 .source-code-link span {
   float: left;
   margin-top: 20px;
@@ -61,9 +74,11 @@
   right: 360px;
   top: 285px;
 }
+
 .userinfo pre {
   margin: 0;
 }
+
 @media (max-width: 63.99em) {
   .userinfo {
     position: initial;
