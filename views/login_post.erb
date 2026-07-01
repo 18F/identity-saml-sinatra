@@ -1,8 +1,8 @@
 <form id="saml-form" action="<%= login_url %>" method="post">
   <% post_params.each do |p, v| %>
-    <input name="<%= p %>" type="hidden" value="<%= v %>" />
+    <input name="<%= p %>" type="hidden" value="<%= v %>">
   <% end %>
-  <input type="submit" />
+  <input type="submit">
 </form>
 
 <script>

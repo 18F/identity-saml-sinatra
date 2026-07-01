@@ -32,7 +32,7 @@ RSpec.describe RelyingParty do
     end
 
     context 'when the request tries to exploit XSS' do
-      it 'protects agains the attack' do
+      it 'protects against the attack' do
         get '/?ial=%22%20onmouseover=%22alert(document.domain)%22%20k=%22'
 
         expect(last_response.body).not_to include('alert(document.domain)')
@@ -285,6 +285,18 @@ RSpec.describe RelyingParty do
         end
       end
     end
+
+    context 'when Initiate User Registration checkbox is checked' do
+      let(:params) { {initiate_registration: 'true' }}
+      it 'sends prompt=create param' do
+        get '/login_get', **params
+
+        expect(last_response).to be_redirect
+
+        prompt = CGI.parse(URI(last_response.location).query)['prompt'][0]
+        expect(prompt).to eq 'create'
+      end 
+    end
   end
 
   describe 'login_post' do
@@ -301,6 +313,16 @@ RSpec.describe RelyingParty do
         'http://idmanagement.gov/ns/assurance/aal/2',
         'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
       ]
+    end
+
+     context 'when Initiate User Registration checkbox is checked' do
+      let(:params) { { initiate_registration: 'true' }}
+      it 'there is a hidden value of prompt=create that gets created' do
+        get '/login_post', **params
+
+        expect(last_response).to be_ok
+        expect(last_response.body).to include('<input name="prompt" type="hidden" value="create">')
+      end 
     end
 
     it 'sets the correct authn_context' do

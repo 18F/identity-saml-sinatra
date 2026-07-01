@@ -106,23 +106,28 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/login_get/?' do
-    puts 'Logging in via GET'
-    saml_auth_request = OneLogin::RubySaml::Authrequest.new
+    puts "Logging in via GET"
     puts "Request: #{saml_auth_request}"
-    ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
-    settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
-    request_url = saml_auth_request.create(settings)
-    request_url += "&#{ { skip_encryption: }.to_query }" if skip_encryption
+    request_url = saml_auth_request.create(
+      saml_request_data('GET'),
+      {
+        skip_encryption:,
+        prompt:,
+      }.compact
+    )
     redirect to(request_url)
   end
 
   get '/login_post/?' do
-    puts 'Logging in via POST'
-    saml_auth_request = OneLogin::RubySaml::Authrequest.new
+    puts "Logging in via POST"
     puts "Request: #{saml_auth_request}"
-    ial, aal, force_authn, skip_encryption, requested_attributes = extract_params
-    settings = saml_settings(ial:, aal:, force_authn:, requested_attributes:)
-    post_params = saml_auth_request.create_params(settings, skip_encryption:, 'RelayState' => params[:id])
+    settings =  saml_request_data('POST')
+    post_params = saml_auth_request.create_params(
+     settings,
+      skip_encryption:,
+      prompt:,
+      'RelayState' => params[:id],
+    )
     login_url   = settings.idp_sso_target_url
     erb :login_post, locals: { login_url:, post_params: }
   end
@@ -246,6 +251,23 @@ class RelyingParty < Sinatra::Base
     end
   end
 
+  def prompt
+    params[:initiate_registration] == 'true' ? 'create' : nil
+  end
+
+  def saml_auth_request
+    @saml_auth_request ||= OneLogin::RubySaml::Authrequest.new
+  end
+
+  def saml_request_data(action)
+    ial, aal, force_authn, requested_attributes = extract_params
+    saml_settings(ial:, aal:, force_authn:, requested_attributes:)
+  end
+
+  def skip_encryption
+    get_param(:skip_encryption, %w[true false])
+  end
+
   def saml_sp_certificate
     return @saml_sp_certificate if defined?(@saml_sp_certificate)
 
@@ -316,9 +338,8 @@ class RelyingParty < Sinatra::Base
     ial = get_param(:ial, %w[sp 1 2 0  facial-match-preferred facial-match-required step-up]) || '1'
     ial = prepare_step_up_flow(session:, ial:, aal:)
     force_authn = get_param(:force_authn, %w[true false])
-    skip_encryption = get_param(:skip_encryption, %w[true false])
     requested_attributes = get_param(:requested_attributes, requested_attributes_options) || []
-    [ial, aal, force_authn, skip_encryption, requested_attributes]
+    [ial, aal, force_authn, requested_attributes]
   end
 
   run! if app_file == $0
