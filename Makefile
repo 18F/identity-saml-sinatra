@@ -4,7 +4,7 @@ PORT ?= 4567
 .env: .env.example
 	cp .env.example .env
 
-setup: .env install_dependencies
+setup: .env install_dependencies copy_vendor
 
 test:
 	bundle exec rspec
@@ -27,3 +27,5 @@ install_dependencies:
 	bundle check || bundle install
 	npm install
 
+copy_vendor: public/vendor
+	cp -R node_modules/@18f/identity-design-system/dist public/vendor/identity-design-system

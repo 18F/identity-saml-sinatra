@@ -47,6 +47,7 @@
   </div>
 </header>
 <main id="main-content">
+  <% if logout_msg || login_msg %>
   <section class="grid-container usa-section" aria-label="Notifications">
     <% if logout_msg %>
     <% type = logout_msg == 'ok' ? 'usa-alert--info' : 'usa-alert--error' %>
@@ -74,6 +75,7 @@
     </div>
     <% end %>
   </section>
+  <% end %>
   <% unless session[:email] %>
     <section aria-label="Authentication Request Specifics">
       <form action="<%= login_path %>" method="GET" id="login-form">
