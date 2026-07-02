@@ -28,7 +28,7 @@ RSpec.describe RelyingParty do
       get '/'
 
       expect(last_response).to be_ok
-      expect(last_response.body).to include('<form action="/login" method="POST">')
+      expect(last_response.body).to include('<form action="/login_get?aal=2&ial=1" method="GET" id="login-form">')
     end
 
     context 'when the request tries to exploit XSS' do
