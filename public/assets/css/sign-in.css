@@ -1,3 +1,7 @@
+.center {
+  text-align: center;
+}
+
 .details-popup {
   position: absolute;
   margin-top: 5px;

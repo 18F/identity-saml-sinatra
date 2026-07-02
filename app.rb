@@ -86,6 +86,8 @@ class RelyingParty < Sinatra::Base
   get '/' do
     logout_msg = session.delete(:logout)
     login_msg = session.delete(:login)
+    errors = session.delete(:errors)
+    error_type = session.delete(:error_type)
     ial, aal, force_authn, skip_encryption = extract_params
 
     login_path = '/login_get?' + {
@@ -94,14 +96,16 @@ class RelyingParty < Sinatra::Base
     }.to_query
 
     erb :index, locals: {
-      ial:,
       aal:,
+      error_type:,
+      errors:,
       force_authn:,
-      skip_encryption:,
-      logout_msg:,
+      ial:,
       login_msg:,
       login_path:,
+      logout_msg:,
       method: 'get',
+      skip_encryption:,
     }
   end
 
@@ -185,14 +189,18 @@ class RelyingParty < Sinatra::Base
       end
     else
       puts 'SAML Fail :('
-      @errors = response.errors
-      erb :failure
+      session[:error_type] = 'Authentication error'
+      session[:errors] = response.errors || ['Something unknown went wrong.']
+
+      redirect to('/')
     end
   end
 
   get '/failure_to_proof' do
     puts 'Failure to Proof :('
-    erb :failure_to_proof
+    session[:error_type] = 'Proofing error'
+    session[:errors] = ['We were unable to verify your identity.']
+    redirect to('/')
   end
 
   private

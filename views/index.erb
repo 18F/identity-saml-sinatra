@@ -1,9 +1,9 @@
 <a class="usa-skipnav" href="#main-content">Skip to main content</a>
-<div class="py1 bg-maroon white fs-12p line-height-1 center">
+ <div class="padding-2 bg-accent-warm text-base-lightest font-mono-xs center">
   TEST Do not use real personal information (demo purposes only) TEST
 </div>
-<div class="py1 bg-navy white fs-12p line-height-1 center">
-  <img class="mr1 align-bottom" src="/assets/img/us-flag.png" alt="U.S. flag" width="18" height="12">
+<div class="padding-2 bg-primary-darker text-base-lightest font-mono-xs center">
+  <img class="width-2" aria-hidden="true" src="vendor/identity-design-system/assets/img/us_flag_small.png" alt="U.S. flag">
   A DEMO website of the United States government
 </div>
 <div class="usa-overlay"></div>
@@ -47,7 +47,7 @@
   </div>
 </header>
 <main id="main-content">
-  <% if logout_msg || login_msg %>
+  <% if logout_msg || login_msg || errors %>
   <section class="grid-container usa-section" aria-label="Notifications">
     <% if logout_msg %>
     <% type = logout_msg == 'ok' ? 'usa-alert--info' : 'usa-alert--error' %>
@@ -64,7 +64,7 @@
       </div>
     </div>
     <% end %>
-     <% if login_msg %>
+    <% if login_msg %>
     <div class="usa-alert usa-alert--info">
       <div class="usa-alert__body">
         <h4 class="usa-alert__heading">Log In</h4>
@@ -74,6 +74,19 @@
       </div>
     </div>
     <% end %>
+
+    <% if errors %>
+    <div class="usa-alert usa-alert--error">
+      <div class="usa-alert__body">
+        <h4 class="usa-alert__heading"><%= error_type %></h4>
+          <% errors.each do |err| %>
+          <p class="usa-alert__text"><%= err %></p>
+          <% end %>
+      </div>
+    </div>
+    <% end %>
+
+
   </section>
   <% end %>
   <% unless session[:email] %>
@@ -277,10 +290,10 @@
         <div class="usa-footer__logo grid-row mobile-lg:grid-col-6 mobile-lg:grid-gap-2">
           <div class="mobile-lg:grid-col-auto">
             <h3 class="usa-footer__logo-heading">SAML Sinatra Example</h3>
-            <a class="usa-footer__primary-link source-code-link" href="https://github.com/18F/identity-saml-sinatra">
-              <div>
-                <img src="/assets/img/GitHub-Mark-120px-plus.png" alt="GitHub Logo" title="GitHub Logo" width="60">
-                <span>Get the Source Code</span>
+            <a class="usa-footer__primary-link" href="https://github.com/18F/identity-saml-sinatra">
+              <div class="display-flex">
+                <div><img src="/assets/img/GitHub-Mark-120px-plus.png" alt="GitHub Logo" title="GitHub Logo" width="60"></div>
+                <div class="margin-left-1 flex-align-self-center">Get the Source Code</div>
               </div>
             </a>
           </div>
@@ -326,16 +339,16 @@
 </footer>
 <script>
   document.getElementById("login_method").addEventListener("change", (e) => {
-  const method = e.target.value;
-  const login_form = document.getElementById("login-form");
-  const current_action = login_form.getAttribute("action");
+    const method = e.target.value;
+    const login_form = document.getElementById("login-form");
+    const current_action = login_form.getAttribute("action");
 
-  if (method == "get") {
-  new_action = current_action.replace("login_post", "login_get")
-  login_form.setAttribute("action", new_action);
-  } else if (method == "post") {
-  new_action = current_action.replace("login_get", "login_post")
-  login_form.setAttribute("action", new_action);
-  }
+    if (method == "get") {
+      new_action = current_action.replace("login_post", "login_get")
+      login_form.setAttribute("action", new_action);
+    } else if (method == "post") {
+      new_action = current_action.replace("login_get", "login_post")
+      login_form.setAttribute("action", new_action);
+    }
   });
 </script>
