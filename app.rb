@@ -189,7 +189,7 @@ class RelyingParty < Sinatra::Base
       end
     else
       puts 'SAML Fail :('
-      session[:error_type] = 'Authentication error'
+      session[:error_type] = 'Authentication failure'
       session[:errors] = response.errors || ['Something unknown went wrong.']
 
       redirect to('/')
@@ -198,7 +198,7 @@ class RelyingParty < Sinatra::Base
 
   get '/failure_to_proof' do
     puts 'Failure to Proof :('
-    session[:error_type] = 'Proofing error'
+    session[:error_type] = 'Proofing failure'
     session[:errors] = ['We were unable to verify your identity.']
     redirect to('/')
   end
