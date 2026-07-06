@@ -28,4 +28,4 @@ install_dependencies:
 	npm install
 
 copy_vendor: public/vendor
-	cp -R node_modules/uswds/dist public/vendor/uswds
+	cp -R node_modules/@18f/identity-design-system/dist public/vendor/identity-design-system

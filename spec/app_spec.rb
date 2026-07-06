@@ -28,7 +28,7 @@ RSpec.describe RelyingParty do
       get '/'
 
       expect(last_response).to be_ok
-      expect(last_response.body).to include('<form action="/login" method="POST">')
+      expect(last_response.body).to include('<form action="/login_get?aal=2&ial=1" method="GET" id="login-form">')
     end
 
     context 'when the request tries to exploit XSS' do
@@ -405,9 +405,10 @@ RSpec.describe RelyingParty do
 
       it 'shows an authentication failure page' do
         post 'consume?SAMLResponse=something'
+        follow_redirect!
 
         expect(last_response).to be_ok
-        expect(last_response.body).to include('Authentication Failure!')
+        expect(last_response.body).to include('Authentication failure')
       end
     end
   end
@@ -415,7 +416,10 @@ RSpec.describe RelyingParty do
   describe 'failure_to_proof' do
     it 'shows the failure to proof page' do
       get '/failure_to_proof'
+      follow_redirect!
+
       expect(last_response).to be_ok
+      expect(last_response.body).to include('Proofing failure')
       expect(last_response.body).to include('We were unable to verify your identity')
     end
   end
