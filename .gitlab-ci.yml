@@ -66,6 +66,7 @@ install_dependencies:
     - *bundle_install
     - *npm_install
     - bundle exec rake login:deploy_json
+    - make copy_vendor
 
 test_release:
   stage: test
