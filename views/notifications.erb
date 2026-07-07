@@ -1,0 +1,43 @@
+<div class="grid-col-8">
+<% if logout_msg || login_msg || errors %>
+
+  <section class="usa-section" aria-label="Notifications">
+    <% if logout_msg %>
+    <% type = logout_msg == 'ok' ? 'usa-alert--info' : 'usa-alert--error' %>
+    <div class="usa-alert <%= type %>">
+      <div class="usa-alert__body">
+        <h4 class="usa-alert__heading">Log Out</h4>
+        <p class="usa-alert__text">
+          <% if logout_msg == 'ok' %>
+            You have been logged out.
+          <% else %>
+            Logout failed!
+          <% end %>
+        </p>
+      </div>
+    </div>
+    <% end %>
+    <% if login_msg %>
+    <div class="usa-alert usa-alert--info">
+      <div class="usa-alert__body">
+        <h4 class="usa-alert__heading">Log In</h4>
+        <p class="usa-alert__text">
+          Login was a Success!
+        </p>
+      </div>
+    </div>
+    <% end %>
+
+    <% if errors %>
+    <div class="usa-alert usa-alert--error">
+      <div class="usa-alert__body">
+        <h4 class="usa-alert__heading"><%= error_type %></h4>
+          <% errors.each do |err| %>
+          <p class="usa-alert__text"><%= err %></p>
+          <% end %>
+      </div>
+    </div>
+    <% end %>
+  </section>
+<% end %>
+</div>

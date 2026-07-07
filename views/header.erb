@@ -1,0 +1,39 @@
+<header class="usa-header usa-header--basic" role="banner">
+  <div class="usa-nav-container">
+    <div class="usa-navbar">
+      <div class="usa-logo" id="extended-logo">
+        <em class="usa-logo__text">
+          <a href="/" title="Home" aria-label="Home">SAML Sinatra Example</a>
+        </em>
+      </div>
+    </div>
+    <nav class="usa-nav">
+      <section aria-label="Logged in information">
+        <div class="display-flex flex-row">
+          <div class="flex-align-self-center margin-right-4">
+            <%= session[:email] if session[:email] %>
+          </div>
+          <div class="flex-1">
+            <% if session[:email] %>
+
+              <form action="/logout" method="POST">
+                <button type="submit" class="usa-button usa-button--outline">Log out</button>
+              </form>
+
+            <% else %>
+              <form>
+                <button type="submit"  class="usa-button usa-button--outline" form="login-form">
+                  <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                    <use href="vendor/identity-design-system/assets/img/sprite.svg#login"></use>
+                  </svg>
+                  Sign in
+                </button>
+              </form>
+
+            <% end %>
+          </div>
+        </div>
+      </section>
+    </nav>
+  </div>
+</header>
