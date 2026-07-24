@@ -24,7 +24,7 @@
         <% if session[:attributes] %>
           <% userinfo = JSON.parse(session[:attributes]) %>
           <div class="p2 clearfix bg-white fg-black">
-            <span>Received user info:</span>
+            <div>Received user info:</div>
             <ul>
               <% userinfo.each_pair do |key, vals| %>
                 <li><code><%= key.inspect %>:
@@ -36,6 +36,7 @@
               <% end %>
             </ul>
           </div>
+          <div><p>Time of authentication: <code><%= session[:authn_instant] %></code></p></div>
         <% end %>
       </div>
     </div>
