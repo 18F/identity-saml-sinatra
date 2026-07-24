@@ -381,10 +381,12 @@ RSpec.describe RelyingParty do
         errors: []
       )
     end
+    let(:authn_instant) { Time.now.utc }
 
     before do
       allow(OneLogin::RubySaml::Response).to receive(:new).and_return(response)
       allow(response).to receive(:is_valid?).and_return(valid_response)
+      allow(response).to receive(:authn_instant).and_return(authn_instant)
     end
 
     context 'when the response is valid' do
@@ -396,6 +398,7 @@ RSpec.describe RelyingParty do
 
         expect(last_request.session[:userid]).to eq(expected_name_id)
         expect(last_request.session[:email]).to eq(expected_email)
+        expect(last_request.session[:authn_instant]).to eq(authn_instant)
         expect(JSON.parse(last_request.session[:attributes])).to eq(expected_attributes)
       end
     end
