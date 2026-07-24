@@ -182,6 +182,7 @@ class RelyingParty < Sinatra::Base
       else
         session[:userid] = user_uuid
         session[:email] = response.attributes['email']
+        session[:authn_instant] = response.authn_instant
         session[:attributes] = response.attributes.to_h.to_json
 
         puts 'SAML Success!'
