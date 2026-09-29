@@ -14,23 +14,23 @@ require 'xml_security'
 # `requested_token_type=urn:ietf:params:oauth:token-type:saml2`: per RFC 8693 §3
 # a base64url-encoded SAML 2.0 *assertion* -- not a <samlp:Response> -- and,
 # because this resource server registered a certificate, wrapped in a
-# <saml:EncryptedAssertion> (SAML-2, SAML-6).
+# <saml:EncryptedAssertion>.
 #
-# Validation is local (SAML-8, §15.5): the signature is checked against the
+# Validation is local: the signature is checked against the
 # certificate(s) in Login.gov's SAML metadata, and Audience, Recipient and the
 # two validity windows are enforced here. Nothing calls Login.gov per request.
 #
 # Every protocol step is one method, in the order `#validate!` runs them, so an
-# agency can copy the class or lift a single step (REF-IMPL-7):
+# agency can copy the class or lift a single step:
 #
 #   decode               RFC 8693 §3; RFC 4648 §5 (base64url, no padding)
 #   decrypt_if_encrypted XML Encryption; SAML Core §2.3.4 (EncryptedAssertion)
 #   parse_assertion      SAML Core §2.3.3 (Assertion, Version, ID)
-#   verify_signature     SAML Core §5.4 (enveloped XML Signature); §15.7 item 3
+#   verify_signature     SAML Core §5.4 (enveloped XML Signature)
 #   check_issuer         SAML Core §2.2.5; Profiles §4.1.4.2
-#   check_subject        SAML Core §2.4.1.2 (bearer SubjectConfirmationData); §15.7 items 3, 5
+#   check_subject        SAML Core §2.4.1.2 (bearer SubjectConfirmationData)
 #   check_conditions     SAML Core §2.5.1 (NotBefore/NotOnOrAfter), §2.5.1.4 (AudienceRestriction)
-#   read_attributes      SAML-5 (delegation_scopes, delegation_id, actor)
+#   read_attributes      delegation_scopes, delegation_id, actor attributes
 #   check_replay         optional agency policy (see AssertionReplayCache)
 #
 # On any failure `InvalidAssertion` is raised with a reason suitable for
@@ -63,7 +63,8 @@ class DelegatedAssertion
     XMLSecurity::Document::SHA512,
   ].freeze
 
-  # The three attributes the exchange appends to the agency SP's bundle (SAML-5).
+  # The three attributes the token exchange appends to the agency's normal
+  # attribute bundle; they are what make an assertion a delegated one.
   DELEGATION_ATTRIBUTES = %w[delegation_scopes delegation_id actor].freeze
 
   # Base64url-decode the `access_token` value (RFC 8693 §3: "a base64url-encoded
@@ -144,8 +145,10 @@ class DelegatedAssertion
 
   # --- step: decrypt --------------------------------------------------------
 
-  # If the token is a <saml:EncryptedAssertion>, decrypt it with the resource
-  # server's private key. Login.gov's saml_idp gem emits XML Encryption 1.0
+  # If the token is a <saml:EncryptedAssertion> (SAML Core §2.3.4), decrypt it
+  # with the resource server's private key. Login.gov encrypts to the
+  # certificate the resource server registered, so only this app can read the
+  # attributes. Login.gov's saml_idp gem emits XML Encryption 1.0
   # with a block cipher named in EncryptedData/EncryptionMethod (aes256-cbc for
   # this app) and the symmetric key wrapped with RSA-OAEP in
   # EncryptedData/ds:KeyInfo/xenc:EncryptedKey. ruby-saml's Utils.decrypt_data
@@ -233,6 +236,9 @@ class DelegatedAssertion
     raise SignatureError.new("signature invalid: #{signed.errors.uniq.join('; ')}")
   end
 
+  # Only SHA-2 signature and digest algorithms (XML Signature 1.1 / RFC 6931
+  # identifiers). RSA-SHA1 and SHA-1 digests are refused because they are
+  # deprecated and Login.gov never uses them.
   def check_signature_algorithms(signature)
     sig_method = signature.at_xpath(
       './ds:SignedInfo/ds:SignatureMethod/@Algorithm', NAMESPACES
@@ -266,11 +272,11 @@ class DelegatedAssertion
   # The Subject must carry a NameID and a bearer SubjectConfirmation whose
   # SubjectConfirmationData names this API as Recipient and has not expired
   # (SAML Core §2.4.1.2; Profiles §4.1.4.3). Login.gov sets NotOnOrAfter to
-  # five minutes after issuance for delegated assertions (SAML-4).
+  # five minutes after issuance for delegated assertions.
   #
   # InResponseTo is refused. Login.gov omits it from delegated assertions; its
   # presence means the assertion answered a browser AuthnRequest, i.e. an
-  # ordinary sign-in, which is never delegation (§15.7 item 5).
+  # ordinary sign-in, which is never delegation.
   def check_subject
     @name_id = text('/saml:Assertion/saml:Subject/saml:NameID')
     @name_id_format = @doc.at_xpath(
@@ -306,13 +312,14 @@ class DelegatedAssertion
   # Conditions: the validity window and the audience (SAML Core §2.5.1).
   #
   # - NotBefore / NotOnOrAfter are enforced with the configured drift
-  #   (§2.5.1.2). Login.gov sets them to issuance -5 s and +1 h (SAML-4).
-  # - Every AudienceRestriction must list this API's identifier (§2.5.1.4:
+  #   (SAML Core §2.5.1.2). Login.gov sets them to issuance -5 s and +1 h.
+  # - Every AudienceRestriction must list this API's identifier (SAML Core §2.5.1.4:
   #   multiple AudienceRestriction elements are independent and all must be
   #   satisfied). An assertion with no AudienceRestriction was not issued to
-  #   this API and is refused (§15.7 item 5).
+  #   this API and is refused; an assertion issued to another audience must
+  #   never be accepted.
   # - Any other Condition type is not understood by this consumer, which per
-  #   §2.5.1 makes the assertion Invalid.
+  #   SAML Core §2.5.1 makes the assertion Invalid.
   def check_conditions
     conditions = @doc.at_xpath('/saml:Assertion/saml:Conditions', NAMESPACES)
     raise InvalidAssertion.new('assertion has no Conditions') if conditions.nil?
@@ -342,8 +349,8 @@ class DelegatedAssertion
 
   # Read the AttributeStatement. Login.gov keys each <saml:Attribute> by Name
   # (FriendlyName carries the same value). The agency SP's bundle (uuid, ial,
-  # aal, email, name...) is exactly what this agency receives at direct sign-in
-  # (SAML-5); the three delegation attributes are appended by the exchange.
+  # aal, email, name...) is exactly what this agency receives at direct sign-in;
+  # the three delegation attributes are appended by the token exchange.
   # An assertion without them is not a delegated assertion and is refused.
   def read_attributes
     @doc.xpath('/saml:Assertion/saml:AttributeStatement/saml:Attribute', NAMESPACES).each do |attr|

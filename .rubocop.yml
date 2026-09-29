@@ -156,7 +156,7 @@ Metrics/AbcSize:
 Metrics/BlockLength:
   CountComments: false  # count full line comments?
   Enabled: true
-  # Reference code favors long, commented, copyable blocks (REF-IMPL-7).
+  # Reference code favors long, commented, copyable blocks.
   Max: 40
   Exclude:
     - '**/bin/*'

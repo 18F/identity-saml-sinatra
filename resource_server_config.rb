@@ -6,8 +6,8 @@ require 'openssl'
 #
 # Every value comes from an environment variable with a local-development
 # default, so the same code runs against a local IdP and against the sandbox by
-# changing environment variables only (REF-IMPL-4). Defaults follow the local
-# development contract shared by the four delegated-access reference repos.
+# changing environment variables only. Defaults match the local-development
+# fixtures shared by the Login.gov IdP and the other delegated-access sample apps.
 class ResourceServerConfig
   DEFAULT_ISSUER = 'urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency'
   DEFAULT_RESOURCE_IDENTIFIER = 'https://benefits-api.agency.localdev'
@@ -24,7 +24,7 @@ class ResourceServerConfig
 
   # The resource server identifier registered with Login.gov. It is the
   # `resource` value the service provider sends to the token exchange and the
-  # value this app requires in Audience and Recipient (SAML-4, §15.7).
+  # value this app requires in the assertion's Audience and Recipient.
   def resource_identifier
     ENV.fetch('RESOURCE_IDENTIFIER', DEFAULT_RESOURCE_IDENTIFIER)
   end

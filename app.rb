@@ -1,3 +1,19 @@
+# Sample agency application for Login.gov in two roles:
+#
+# 1. Direct SAML sign-in (the original sample): /login_get, /login_post,
+#    /consume, /logout, /slo_logout. Unchanged.
+# 2. SAML resource server for delegated access: a third-party service provider
+#    obtains a SAML 2.0 assertion for this API from Login.gov's token exchange
+#    (RFC 8693) and presents it as a bearer token (RFC 6750). GET/POST
+#    /api/benefits validate it locally (DelegatedAssertion) and enforce the
+#    scopes the user approved; /decisions shows every decision; /attempts-api
+#    is the agency-role Attempts API viewer that joins Login.gov's events to
+#    those decisions on delegation_id.
+#
+# Supporting files: resource_server_config.rb (env vars), idp_metadata.rb
+# (IdP signing certificates), delegated_assertion.rb (validation steps),
+# assertion_replay_cache.rb, decision_log.rb, demo_benefits.rb,
+# attempts_client.rb and attempts_configuration.rb.
 require 'dotenv/load'
 require 'erb'
 require 'hashie/mash'
@@ -460,8 +476,10 @@ class RelyingParty < Sinatra::Base
     )
   end
 
-  # The `delegation_scopes` attribute lists exactly the
-  # capabilities the user approved for this resource. Compare full strings.
+  # The `delegation_scopes` attribute lists exactly the capabilities the user
+  # approved for this resource, as space-delimited scope strings (RFC 6749
+  # §3.3) in their full `token_exchange:<value>` form. Compare full strings;
+  # never match on a prefix or substring.
   def enforce_scope(assertion, required_scope)
     return if assertion.delegation_scopes.include?(required_scope)
 
@@ -548,7 +566,8 @@ class RelyingParty < Sinatra::Base
   # Attempts API helpers (agency role)
   # ---------------------------------------------------------------------------
 
-  # Poll the Attempts API with this agency's credentials.
+  # Poll the Attempts API with this agency's credentials (see AttemptsClient
+  # for the wire protocol). Events are Security Event Tokens (RFC 8417).
   # @return [Array<Hash>] decrypted Security Event Tokens
   def attempts_events(ack: nil)
     config = settings.rs_config
@@ -602,7 +621,9 @@ class RelyingParty < Sinatra::Base
     end
   end
 
-  # Redact event fields not in ALLOWED_PLAINTEXT_KEYS (recursively).
+  # Redact event fields not in ALLOWED_PLAINTEXT_KEYS (recursively). Events
+  # can carry personal data; the demo shows only fields needed to follow a
+  # session unless allow_all_events_plaintext is set.
   def event_data(payload)
     return payload if settings.rs_config.allow_all_events_plaintext?
 

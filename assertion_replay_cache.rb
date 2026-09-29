@@ -6,11 +6,11 @@
 # This is optional agency policy, not a Login.gov requirement. RFC 8693 §3 and
 # SAML Core §2.5.1 do not forbid re-presenting a bearer assertion within its
 # validity window, and the service provider is expected to hold each assertion
-# for up to five minutes (SAML-4) and call the API more than once with it. An
+# for up to five minutes and call the API more than once with it. An
 # agency that wants one-call-per-assertion semantics keeps this enabled and
 # tells its service providers to refresh before every call; one that expects
-# repeat calls sets REPLAY_PROTECTION=false. The requirements' §11 lists replay
-# protection as a consumer-side control for this repository.
+# repeat calls sets REPLAY_PROTECTION=false. Replay protection is the
+# consumer-side control against a captured assertion being reused.
 #
 # In-memory and per process. A multi-instance deployment would back this with
 # a shared store keyed the same way.

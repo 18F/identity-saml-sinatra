@@ -1,8 +1,9 @@
+<%# Delegated sessions tab: for each delegation_id, the Attempts events and the API decisions that share it. %>
 <p>
   Each delegated session is one <code>delegation_id</code>: the Attempts events Login.gov sent for
   it (consent, token issuance, refresh, revocation, and the sign-in events re-mapped to this
   agency) followed by the calls this API authorized or refused for assertions carrying the same
-  <code>delegation_id</code>. This is the join described in §8.5.
+  <code>delegation_id</code>. This is the join a target agency implements.
 </p>
 <% if sessions.empty? %>
   <p>No delegated sessions in the current events.</p>

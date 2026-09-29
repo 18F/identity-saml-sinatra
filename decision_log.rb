@@ -2,7 +2,7 @@
 
 # In-memory ring buffer of authorization decisions the API made, shown at
 # GET /decisions and joined to Attempts API events on delegation_id in the
-# Attempts viewer's "Delegated sessions" tab (§8.5, REF-IMPL-2/3).
+# Attempts viewer's "Delegated sessions" tab.
 #
 # Demo affordance: a real agency writes these to its audit log. Nothing here
 # is required by the protocol.

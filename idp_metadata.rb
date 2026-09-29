@@ -7,7 +7,7 @@ require 'openssl'
 
 # Fetches and caches Login.gov's SAML metadata so delegated assertions can be
 # validated against the IdP's published signing certificate(s) with no
-# per-request call to Login.gov (§15.5, SAML-8).
+# per-request call to Login.gov.
 #
 # Login.gov publishes metadata at a year-suffixed path (/api/saml/metadata<YYYY>)
 # and rotates signing keys by publishing a new year. The metadata is fetched

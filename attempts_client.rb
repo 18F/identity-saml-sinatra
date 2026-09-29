@@ -22,7 +22,7 @@ require 'jwt'
 # The events a target agency receives for delegated access are the ordinary
 # sign-in events re-mapped with `delegation_id`, plus
 # delegated-access-consented, delegated-access-token-issued,
-# delegated-access-token-refreshed and delegated-access-revoked (§8, §8.5).
+# delegated-access-token-refreshed and delegated-access-revoked.
 class AttemptsClient
   class Error < StandardError; end
 
@@ -31,6 +31,10 @@ class AttemptsClient
     @signing_key = signing_key
   end
 
+  # One poll request. Acknowledging JTIs deletes those events on the IdP so
+  # they are not delivered again; unacknowledged events are redelivered until
+  # their TTL. Returns the events in the response (not the acknowledged ones).
+  #
   # @param ack [Array<String>, nil] JTIs to acknowledge (delete) on the IdP
   # @param max_events [Integer]
   # @return [Array<Hash>] decrypted Security Event Tokens
@@ -52,6 +56,9 @@ class AttemptsClient
 
   private
 
+  # JWE (RFC 7516) encrypted to the agency's registered public key; the
+  # plaintext is the Security Event Token (RFC 8417) JSON, or an ES256 JWT of
+  # it when the IdP signs events, verified with the key from its JWKS.
   def decrypt_event(jwe)
     plaintext = JWE.decrypt(jwe, @config.attempts_private_key)
     if @config.signed_events?

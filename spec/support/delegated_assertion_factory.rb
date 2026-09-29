@@ -9,7 +9,7 @@ require 'xml_security'
 require 'xmlenc'
 
 # Builds delegated SAML assertions shaped like the ones Login.gov's token
-# exchange mints (requirements §15.4 / SAML-4, SAML-5) with a throwaway IdP
+# exchange mints with a throwaway IdP
 # key pair, signs them the way ruby-saml does, and (optionally) encrypts them
 # with xmlenc using the same template as the IdP's saml_idp Encryptor.
 module DelegatedAssertionFactory
