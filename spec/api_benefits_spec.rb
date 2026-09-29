@@ -186,6 +186,12 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       expect(body_json['error_description']).to match(/InResponseTo/)
     end
 
+    it 'accepts an assertion that carries the delegation but not the actor attribute' do
+      bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.except('actor'))
+      get '/api/benefits'
+      expect(last_response.status).to eq 200
+    end
+
     it 'rejects an assertion without the delegation attributes' do
       bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.except('delegation_scopes', 'delegation_id', 'actor'))
       get '/api/benefits'

@@ -63,9 +63,15 @@ class DelegatedAssertion
     XMLSecurity::Document::SHA512,
   ].freeze
 
-  # The three attributes the token exchange appends to the agency's normal
-  # attribute bundle; they are what make an assertion a delegated one.
-  DELEGATION_ATTRIBUTES = %w[delegation_scopes delegation_id actor].freeze
+  # The token exchange appends three attributes to the agency's normal bundle.
+  # `delegation_scopes` (what the user approved) and `delegation_id` (the join
+  # key to Attempts events) are what make an assertion a delegated one and are
+  # required. `actor` names the service provider acting for the user (the SAML
+  # counterpart of the OAuth `act` claim, RFC 8693 §4.1); it is observed and
+  # logged, never a reason to reject on its own, so an API that also accepts
+  # assertions without it keeps working.
+  REQUIRED_DELEGATION_ATTRIBUTES = %w[delegation_scopes delegation_id].freeze
+  DELEGATION_ATTRIBUTES = (REQUIRED_DELEGATION_ATTRIBUTES + %w[actor]).freeze
 
   # Base64url-decode the `access_token` value (RFC 8693 §3: "a base64url-encoded
   # SAML 2.0 assertion"; RFC 4648 §5, no padding). Padding is tolerated.
@@ -361,7 +367,7 @@ class DelegatedAssertion
       @attributes[name] = values.size == 1 ? values.first : values
     end
 
-    missing = DELEGATION_ATTRIBUTES.reject { |k| @attributes[k].to_s.strip != '' }
+    missing = REQUIRED_DELEGATION_ATTRIBUTES.reject { |k| @attributes[k].to_s.strip != '' }
     unless missing.empty?
       raise InvalidAssertion.new("not a delegated assertion: missing #{missing.join(', ')}")
     end

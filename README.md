@@ -153,9 +153,11 @@ Service provider ── GET /api/benefits  Authorization: Bearer <access_token> 
    must contain `RESOURCE_IDENTIFIER` (SAML Core §2.5.1.4); no `AudienceRestriction` or any
    other Condition type makes the assertion invalid (SAML Core §2.5.1).
 7. `read_attributes` — the `AttributeStatement`, keyed by `Name`. `delegation_scopes`
-   (space-separated `token_exchange:*` values), `delegation_id` and `actor` are required;
-   without them it is not a delegated assertion. `actor` is the service provider's issuer,
-   the SAML counterpart of the OAuth `act` claim (RFC 8693 §4.1).
+   (space-separated `token_exchange:*` values) and `delegation_id` are required; without them
+   it is not a delegated assertion. `actor` is the service provider's issuer, the SAML
+   counterpart of the OAuth `act` claim (RFC 8693 §4.1); it is observed and logged when present
+   but its absence alone is never a reason to reject, so an API that also accepts assertions
+   without it keeps working.
 8. `check_replay` — optional, see below.
 
 No step calls Login.gov. Metadata is fetched from `IDP_METADATA_URL` once and cached; a
