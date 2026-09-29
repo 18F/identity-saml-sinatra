@@ -11,6 +11,7 @@ require 'active_support/core_ext/object/to_query'
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
 
+  # rubocop:disable Metrics/BlockLength
   helpers do
     def ial_select_options
       options = [
@@ -82,6 +83,7 @@ class RelyingParty < Sinatra::Base
       default_requested_attributes_by_ial
     end
   end
+  # rubocop:enable Metrics/BlockLength
 
   get '/' do
     logout_msg = session.delete(:logout)
@@ -110,20 +112,20 @@ class RelyingParty < Sinatra::Base
   end
 
   get '/login_get/?' do
-    puts "Logging in via GET"
+    puts 'Logging in via GET'
     puts "Request: #{saml_auth_request}"
     request_url = saml_auth_request.create(
       saml_request_data('GET'),
       {
         skip_encryption:,
         prompt:,
-      }.compact
+      }.compact,
     )
     redirect to(request_url)
   end
 
   get '/login_post/?' do
-    puts "Logging in via POST"
+    puts 'Logging in via POST'
     puts "Request: #{saml_auth_request}"
     settings =  saml_request_data('POST')
     post_params = saml_auth_request.create_params(
@@ -132,7 +134,7 @@ class RelyingParty < Sinatra::Base
       prompt:,
       'RelayState' => params[:id],
     )
-    login_url   = settings.idp_sso_target_url
+    login_url = settings.idp_sso_target_url
     erb :login_post, locals: { login_url:, post_params: }
   end
 
@@ -148,7 +150,8 @@ class RelyingParty < Sinatra::Base
 
     logout_response = OneLogin::RubySaml::Logoutresponse.new(params[:SAMLResponse], saml_settings)
 
-    if logout_response.validate # ruby-saml uses is_valid? for some and validate for others inconsistently
+    # ruby-saml uses is_valid? for some and validate for others inconsistently
+    if logout_response.validate
       puts 'Logout OK'
       logout_session
       session[:logout] = 'ok'
@@ -281,7 +284,7 @@ class RelyingParty < Sinatra::Base
     return @saml_sp_certificate if defined?(@saml_sp_certificate)
 
     if running_in_prod_env? && !ENV['sp_cert']
-      raise NotImplementedError, 'Refusing to use demo cert in production'
+      raise NotImplementedError.new('Refusing to use demo cert in production')
     end
 
     @saml_sp_certificate = ENV['sp_cert'] || File.read('config/demo_sp.crt')
@@ -291,7 +294,7 @@ class RelyingParty < Sinatra::Base
     return @saml_sp_private_key if defined?(@saml_sp_private_key)
 
     if running_in_prod_env? && !ENV['sp_private_key']
-      raise NotImplementedError, 'Refusing to use demo private key in production'
+      raise NotImplementedError.new('Refusing to use demo private key in production')
     end
 
     @saml_sp_private_key = ENV['sp_private_key'] || File.read('config/demo_sp.key')

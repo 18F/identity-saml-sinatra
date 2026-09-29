@@ -1,6 +1,6 @@
 ---
 assertion_consumer_service_url: <%= ENV['assertion_consumer_service_url'] %>
-issuer: <%= ENV['issuer'] %>
+issuer: <%= ENV['issuer'] || 'urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency' %>
 idp_sso_target_url: <%= ENV['idp_sso_target_url'] %>
 idp_slo_target_url: <%= ENV['idp_slo_target_url'] %>
 idp_cert_fingerprint: <%= ENV['idp_cert_fingerprint'] %>

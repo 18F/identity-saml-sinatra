@@ -122,8 +122,8 @@ RSpec.describe RelyingParty do
     let(:params) { { requested_attributes: ['x509_presented', 'email'] } }
 
     before do
-      allow(OneLogin::RubySaml::Settings).to receive(:new)
-        .and_call_original
+      allow(OneLogin::RubySaml::Settings).to receive(:new).
+        and_call_original
     end
 
     describe 'force_authn' do
@@ -136,8 +136,8 @@ RSpec.describe RelyingParty do
         it 'calls Saml::Settings with the correct value for force_authn' do
           get '/login_get', **params
 
-          expect(OneLogin::RubySaml::Settings).to have_received(:new)
-            .with(hash_including('force_authn' => expected_force_authn))
+          expect(OneLogin::RubySaml::Settings).to have_received(:new).
+            with(hash_including('force_authn' => expected_force_authn))
         end
       end
 
@@ -147,8 +147,8 @@ RSpec.describe RelyingParty do
         it 'calls Saml::Settings with the correct value for force_authn' do
           get '/login_get', **params
 
-          expect(OneLogin::RubySaml::Settings).to have_received(:new)
-            .with(hash_including('force_authn' => expected_force_authn))
+          expect(OneLogin::RubySaml::Settings).to have_received(:new).
+            with(hash_including('force_authn' => expected_force_authn))
         end
       end
     end
@@ -179,14 +179,14 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/1',
           'http://idmanagement.gov/ns/assurance/aal/2',
-          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',]
         end
 
         it 'sets the correct authn_context' do
           get '/login_get', **params
 
-          expect(OneLogin::RubySaml::Settings).to have_received(:new)
-            .with(hash_including(authn_context: expected_authn_context))
+          expect(OneLogin::RubySaml::Settings).to have_received(:new).
+            with(hash_including(authn_context: expected_authn_context))
         end
 
         context 'when semantic ial values are enabled' do
@@ -198,15 +198,15 @@ RSpec.describe RelyingParty do
             [
               'urn:acr.login.gov:auth-only',
               'http://idmanagement.gov/ns/assurance/aal/2',
-              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
             ]
           end
 
           it 'sets the correct authn_context' do
             get 'login_get', **params
 
-            expect(OneLogin::RubySaml::Settings).to have_received(:new)
-              .with(hash_including(authn_context: expected_authn_context))
+            expect(OneLogin::RubySaml::Settings).to have_received(:new).
+              with(hash_including(authn_context: expected_authn_context))
           end
         end
       end
@@ -216,14 +216,14 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/2?bio=preferred',
           'http://idmanagement.gov/ns/assurance/aal/2',
-          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',]
         end
 
         it 'sets the correct authn_context' do
           get '/login_get', **params
 
-          expect(OneLogin::RubySaml::Settings).to have_received(:new)
-            .with(hash_including(authn_context: expected_authn_context))
+          expect(OneLogin::RubySaml::Settings).to have_received(:new).
+            with(hash_including(authn_context: expected_authn_context))
         end
 
         context 'when semantic ial values are enabled' do
@@ -235,15 +235,15 @@ RSpec.describe RelyingParty do
             [
               'urn:acr.login.gov:verified-facial-match-preferred',
               'http://idmanagement.gov/ns/assurance/aal/2',
-              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
             ]
           end
 
           it 'sets the correct authn_context' do
             get '/login_get', **params
 
-            expect(OneLogin::RubySaml::Settings).to have_received(:new)
-              .with(hash_including(authn_context: expected_authn_context))
+            expect(OneLogin::RubySaml::Settings).to have_received(:new).
+              with(hash_including(authn_context: expected_authn_context))
           end
         end
       end
@@ -253,14 +253,14 @@ RSpec.describe RelyingParty do
         let(:expected_authn_context) do
           ['http://idmanagement.gov/ns/assurance/ial/2?bio=required',
           'http://idmanagement.gov/ns/assurance/aal/2',
-          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email']
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',]
         end
 
         it 'sets the correct authn_context' do
           get '/login_get', **params
 
-          expect(OneLogin::RubySaml::Settings).to have_received(:new)
-            .with(hash_including(authn_context: expected_authn_context))
+          expect(OneLogin::RubySaml::Settings).to have_received(:new).
+            with(hash_including(authn_context: expected_authn_context))
         end
 
         context 'when semantic ial values are enabled' do
@@ -272,15 +272,15 @@ RSpec.describe RelyingParty do
             [
               'urn:acr.login.gov:verified-facial-match-required',
               'http://idmanagement.gov/ns/assurance/aal/2',
-              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+              'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
             ]
           end
 
           it 'sets the correct authn_context' do
             get '/login_get', **params
 
-            expect(OneLogin::RubySaml::Settings).to have_received(:new)
-              .with(hash_including(authn_context: expected_authn_context))
+            expect(OneLogin::RubySaml::Settings).to have_received(:new).
+              with(hash_including(authn_context: expected_authn_context))
           end
         end
       end
@@ -303,15 +303,15 @@ RSpec.describe RelyingParty do
     let(:params) { { requested_attributes: ['x509_presented', 'email'] } }
 
     before do
-      allow(OneLogin::RubySaml::Settings).to receive(:new)
-        .and_call_original
+      allow(OneLogin::RubySaml::Settings).to receive(:new).
+        and_call_original
     end
 
     let(:expected_authn_context) do
       [
         'http://idmanagement.gov/ns/assurance/ial/1',
         'http://idmanagement.gov/ns/assurance/aal/2',
-        'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+        'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
       ]
     end
 
@@ -328,8 +328,8 @@ RSpec.describe RelyingParty do
     it 'sets the correct authn_context' do
       get 'login_post', **params
 
-      expect(OneLogin::RubySaml::Settings).to have_received(:new)
-        .with(hash_including(authn_context: expected_authn_context))
+      expect(OneLogin::RubySaml::Settings).to have_received(:new).
+        with(hash_including(authn_context: expected_authn_context))
     end
 
     context 'when 2-phishing_resistant aal is requested' do
@@ -338,15 +338,15 @@ RSpec.describe RelyingParty do
         [
           'http://idmanagement.gov/ns/assurance/ial/1',
           'http://idmanagement.gov/ns/assurance/aal/2?phishing_resistant=true',
-          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
         ]
       end
 
       it 'sets the correct authn_context' do
         get 'login_post', **params
 
-        expect(OneLogin::RubySaml::Settings).to have_received(:new)
-          .with(hash_including(authn_context: expected_authn_context))
+        expect(OneLogin::RubySaml::Settings).to have_received(:new).
+          with(hash_including(authn_context: expected_authn_context))
       end
     end
 
@@ -356,15 +356,15 @@ RSpec.describe RelyingParty do
         [
           'http://idmanagement.gov/ns/assurance/ial/1',
           'http://idmanagement.gov/ns/assurance/aal/2?hspd12=true',
-          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email'
+          'http://idmanagement.gov/ns/requested_attributes?ReqAttr=x509_presented,email',
         ]
       end
 
       it 'sets the correct authn_context' do
         get 'login_post', **params
 
-        expect(OneLogin::RubySaml::Settings).to have_received(:new)
-          .with(hash_including(authn_context: expected_authn_context))
+        expect(OneLogin::RubySaml::Settings).to have_received(:new).
+          with(hash_including(authn_context: expected_authn_context))
       end
     end
   end
@@ -378,7 +378,7 @@ RSpec.describe RelyingParty do
         OneLogin::RubySaml::Response,
         name_id: expected_name_id,
         attributes: expected_attributes,
-        errors: []
+        errors: [],
       )
     end
     let(:authn_instant) { Time.now.utc }

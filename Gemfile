@@ -5,7 +5,10 @@ ruby "~> #{File.read(File.join(__dir__, '.ruby-version')).strip}"
 
 gem 'aws-sdk-s3', '>= 1.208.0'
 gem 'dotenv'
+gem 'faraday'
 gem 'hashie'
+gem 'jwe'
+gem 'jwt', '~> 2.1'
 gem 'rexml'
 gem 'ruby-saml', '>= 1.9.0'
 gem 'rack-test', '>= 2.0.0'
@@ -24,8 +27,13 @@ group :test do
   gem 'bundler-audit', require: false
   gem 'simplecov', require: false
   gem 'webmock'
+  # Used by the specs to build EncryptedAssertion fixtures the same way the
+  # IdP's saml_idp gem does (SamlIdp::Encryptor wraps xmlenc).
+  gem 'xmlenc'
 end
 
 group :development, :test do
   gem 'rspec'
+  gem 'rubocop', require: false
+  gem 'rubocop-rspec', require: false
 end

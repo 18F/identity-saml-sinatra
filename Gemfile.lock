@@ -1,6 +1,8 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    activemodel (8.1.3)
+      activesupport (= 8.1.3)
     activesupport (8.1.3)
       base64
       bigdecimal
@@ -16,6 +18,7 @@ GEM
       uri (>= 0.13.1)
     addressable (2.9.0)
       public_suffix (>= 2.0.2, < 8.0)
+    ast (2.4.3)
     aws-eventstream (1.4.0)
     aws-partitions (1.1252.0)
     aws-sdk-core (3.247.0)
@@ -50,6 +53,12 @@ GEM
     docile (1.4.1)
     dotenv (3.2.0)
     drb (2.2.3)
+    faraday (2.14.4)
+      faraday-net_http (>= 2.0, < 3.5)
+      json
+      logger
+    faraday-net_http (3.4.4)
+      net-http (~> 0.5)
     hashdiff (1.2.1)
     hashie (5.1.0)
       logger
@@ -58,6 +67,12 @@ GEM
     io-console (0.8.2)
     jmespath (1.6.2)
     json (2.20.0)
+    jwe (1.1.1)
+      base64
+    jwt (2.10.3)
+      base64
+    language_server-protocol (3.17.0.6)
+    lint_roller (1.1.0)
     logger (1.7.0)
     method_source (1.1.0)
     mini_portile2 (2.8.9)
@@ -66,10 +81,16 @@ GEM
       prism (~> 1.5)
     mustermann (3.0.4)
       ruby2_keywords (~> 0.0.1)
+    net-http (0.9.1)
+      uri (>= 0.11.1)
     nio4r (2.7.5)
     nokogiri (1.19.4)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
+    parallel (2.2.0)
+    parser (3.3.12.0)
+      ast (~> 2.4.1)
+      racc
     power_assert (3.0.1)
     prism (1.9.0)
     pry (0.16.0)
@@ -92,7 +113,9 @@ GEM
       rack (>= 1.3)
     rackup (2.3.1)
       rack (>= 3)
+    rainbow (3.1.1)
     rake (13.4.2)
+    regexp_parser (2.13.1)
     reline (0.6.3)
       io-console (~> 0.5)
     rexml (3.4.4)
@@ -109,6 +132,25 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.7)
+    rubocop (1.91.0)
+      json (>= 2.3)
+      language_server-protocol (~> 3.17.0.2)
+      lint_roller (~> 1.1.0)
+      parallel (>= 1.10)
+      parser (>= 3.3.0.2)
+      rainbow (>= 2.2.2, < 4.0)
+      regexp_parser (>= 2.9.3, < 3.0)
+      rubocop-ast (>= 1.49.0, < 2.0)
+      ruby-progressbar (~> 1.7)
+      unicode-display_width (>= 2.4.0, < 4.0)
+    rubocop-ast (1.50.0)
+      parser (>= 3.3.7.2)
+      prism (~> 1.7)
+    rubocop-rspec (3.10.2)
+      lint_roller (~> 1.1)
+      regexp_parser (>= 2.0)
+      rubocop (~> 1.86, >= 1.86.2)
+    ruby-progressbar (1.13.0)
     ruby-saml (1.18.1)
       nokogiri (>= 1.13.10)
       rexml
@@ -133,11 +175,21 @@ GEM
     tilt (2.6.1)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
+    unicode-display_width (3.3.0)
+      unicode-emoji (~> 4.3)
+    unicode-emoji (4.3.0)
     uri (1.1.1)
     webmock (3.26.2)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
+    xmlenc (0.8.0)
+      activemodel (>= 3.0.0)
+      activesupport (>= 3.0.0)
+      nokogiri (>= 1.6.0, < 2.0.0)
+      xmlmapper (>= 0.7.3)
+    xmlmapper (0.8.1)
+      nokogiri (~> 1.11)
 
 PLATFORMS
   ruby
@@ -147,7 +199,10 @@ DEPENDENCIES
   aws-sdk-s3 (>= 1.208.0)
   bundler-audit
   dotenv
+  faraday
   hashie
+  jwe
+  jwt (~> 2.1)
   pry
   puma
   rack-test (>= 2.0.0)
@@ -155,11 +210,14 @@ DEPENDENCIES
   rake
   rexml
   rspec
+  rubocop
+  rubocop-rspec
   ruby-saml (>= 1.9.0)
   simplecov
   sinatra (>= 3.0.4)
   test-unit
   webmock
+  xmlenc
 
 RUBY VERSION
    ruby 3.4.4p34
