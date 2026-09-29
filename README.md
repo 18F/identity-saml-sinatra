@@ -148,7 +148,7 @@ Service provider ── GET /api/benefits  Authorization: Bearer <access_token> 
    `SubjectConfirmationData` has `Recipient == RESOURCE_IDENTIFIER`, `NotOnOrAfter` in the
    future (60 s drift; Login.gov sets it to issuance + 5 minutes), and **no `InResponseTo`**
    — an assertion answering a browser AuthnRequest is an ordinary sign-in, never delegation
-   (SAML Core §2.4.1.2; requirements §15.7 item 5).
+   (SAML Core §2.4.1.2).
 6. `check_conditions` — `NotBefore`/`NotOnOrAfter` with drift; every `AudienceRestriction`
    must contain `RESOURCE_IDENTIFIER` (SAML Core §2.5.1.4); no `AudienceRestriction` or any
    other Condition type makes the assertion invalid (SAML Core §2.5.1).

@@ -130,7 +130,7 @@ class DelegatedAssertion
   end
 
   # The service provider acting for the user: SAML counterpart of the OAuth
-  # `act` claim (RFC 8693 §4.1; requirements §15.4).
+  # `act` claim (RFC 8693 §4.1).
   def actor
     attributes['actor']
   end
@@ -197,7 +197,7 @@ class DelegatedAssertion
   # --- step: signature ------------------------------------------------------
 
   # Verify the enveloped XML Signature over the assertion against a certificate
-  # from the IdP's metadata (§15.7 items 2-3; SAML Core §5.4).
+  # from the IdP's metadata, which SAML relying parties already trust (SAML Core §5.4).
   #
   # Choice of API: ruby-saml's XMLSecurity::SignedDocument is used directly on
   # the bare assertion rather than wrapping it in a synthetic <samlp:Response>
