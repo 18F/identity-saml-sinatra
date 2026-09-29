@@ -104,7 +104,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       expect(last_response.headers['WWW-Authenticate']).not_to include('error=')
     end
 
-    it 'rejects an assertion for another audience (§15.7 item 5)' do
+    it 'rejects an assertion issued to another audience' do
       bearer F.token(audience: 'https://records-api.agency.localdev')
       get '/api/benefits'
 
@@ -239,6 +239,8 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       get '/api/benefits'
 
       expect(last_response.status).to eq(503)
+      expect(body_json['error_description']).not_to include('localhost:3000')
+      expect(RelyingParty.settings.decision_log.entries.first.reason).to include('500')
     end
 
     it 're-fetches metadata once when the signing key rotated' do

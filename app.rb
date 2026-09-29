@@ -21,7 +21,7 @@ require_relative './attempts_client'
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
 
-  # --- Delegated-access resource server state (requirements §15.7, Appendix D step 19) ---
+  # --- Delegated-access resource server state ---
   # These live on the class so every request shares them within the process.
   set :rs_config, ResourceServerConfig.new
   set :decision_log, DecisionLog.new(max_size: rs_config.decision_log_size)
@@ -49,8 +49,8 @@ class RelyingParty < Sinatra::Base
 
   # Attempts API event fields shown in plain text; everything else is redacted
   # unless allow_all_events_plaintext is set. The identity-oidc-sinatra list
-  # plus the delegated-access fields (§8.4) and the subject identifiers an
-  # agency needs to recognize a delegated session (§8.5).
+  # plus the delegated-access fields and the subject identifiers an agency
+  # needs to recognize a delegated session.
   ALLOWED_PLAINTEXT_KEYS = %w[
     application_url
     aws_region
@@ -83,7 +83,7 @@ class RelyingParty < Sinatra::Base
     resource
   ].freeze
 
-  # Event types added for delegated access (§8.4). Any event carrying a
+  # Event types added for delegated access. Any event carrying a
   # delegation_id belongs to a delegated session, including the existing
   # sign-in event types re-mapped to the target agency.
   DELEGATED_EVENT_TYPES = %w[
@@ -305,7 +305,7 @@ class RelyingParty < Sinatra::Base
 
 
   # ===========================================================================
-  # Delegated-access API (§15.7). The service provider calls these with the
+  # Delegated-access API. The service provider calls these with the
   # SAML assertion Login.gov's token exchange issued for this resource server.
   # ===========================================================================
 
@@ -332,7 +332,7 @@ class RelyingParty < Sinatra::Base
     halt_json(400, 'invalid_request', e.message)
   end
 
-  # Every decision the API made (REF-IMPL-2), newest first.
+  # Every decision the API made, newest first.
   get '/decisions' do
     erb :decisions, locals: { decisions: settings.decision_log.entries }
   end
@@ -342,7 +342,7 @@ class RelyingParty < Sinatra::Base
   end
 
   # ===========================================================================
-  # Attempts API viewer in the agency role (§8.5, REF-IMPL-3). Polls with the
+  # Attempts API viewer in the agency role. Polls with the
   # agency's credentials; the "Delegated sessions" tab groups events by
   # delegation_id and lists the API decisions carrying the same delegation_id.
   # ===========================================================================
@@ -385,11 +385,11 @@ class RelyingParty < Sinatra::Base
   #
   #   bearer_token                RFC 6750 §2.1  Authorization: Bearer <access_token>
   #   DelegatedAssertion.decode   RFC 8693 §3    base64url SAML 2.0 assertion
-  #   validate_assertion          §15.7 items 2, 3, 5  signature, Issuer, Recipient,
-  #                               Audience, both time windows, no InResponseTo;
-  #                               no call to Login.gov
-  #   enforce_scope               §15.7 item 4   delegation_scopes per endpoint
-  #   log_decision                REF-IMPL-2     record what was decided
+  #   validate_assertion          SAML Core §2.4.1.2, §2.5.1, §5.4  signature, Issuer,
+  #                               Recipient, Audience, both time windows, no
+  #                               InResponseTo; no call to Login.gov
+  #   enforce_scope               delegation_scopes per endpoint
+  #   log_decision                record what was decided
   #
   # @return [DelegatedAssertion] the validated assertion
   def authorize!(required_scope)
@@ -412,14 +412,15 @@ class RelyingParty < Sinatra::Base
     log_decision(e.assertion, required_scope:, decision: 'deny', reason: e.message)
     halt_bearer_error(403, 'insufficient_scope', e.message, scope: required_scope)
   rescue IdpMetadata::FetchError => e
-    # Fail closed: without the IdP's certificate nothing can be verified.
+    # Fail closed: without the IdP's certificate nothing can be verified. The
+    # detail (URL, socket error) goes to the decision log, not to the caller.
     log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
-    halt_json(503, 'temporarily_unavailable', e.message)
+    halt_json(503, 'temporarily_unavailable', 'IdP metadata is not available; try again later')
   end
 
   # RFC 6750 §2.1: the access token is sent in the Authorization header with
   # the Bearer scheme (scheme name case-insensitive) in b64token syntax. The
-  # form-body (§2.2) and query (§2.3) methods are not accepted.
+  # form-body (RFC 6750 §2.2) and query (§2.3) methods are not accepted.
   #
   # @return [String] the token exactly as the service provider received it
   def bearer_token
@@ -459,7 +460,7 @@ class RelyingParty < Sinatra::Base
     )
   end
 
-  # §15.7 item 4: the `delegation_scopes` attribute lists exactly the
+  # The `delegation_scopes` attribute lists exactly the
   # capabilities the user approved for this resource. Compare full strings.
   def enforce_scope(assertion, required_scope)
     return if assertion.delegation_scopes.include?(required_scope)
@@ -467,7 +468,7 @@ class RelyingParty < Sinatra::Base
     raise InsufficientScope.new(assertion, required_scope)
   end
 
-  # Record the decision (REF-IMPL-2 "shows every decision it made"). When the
+  # Record the decision so the API can show every decision it made. When the
   # assertion did not validate, only the reason is recorded: nothing read from
   # an unverified assertion is trusted enough to log as fact.
   def log_decision(assertion, required_scope:, decision:, reason: nil)
@@ -516,7 +517,7 @@ class RelyingParty < Sinatra::Base
   end
 
   # Response body for both routes. `delegated_access` is what a
-  # delegation-aware API reads (§15.7 item 4): the acting service provider,
+  # delegation-aware API reads: the acting service provider,
   # the delegation_id that joins to Attempts API events, and the approved
   # scopes. `_assertion` is a demo affordance so the service provider's demo
   # page can show what the API saw; a production API would not echo it.
@@ -573,7 +574,7 @@ class RelyingParty < Sinatra::Base
       !payload['delegation_id'].nil? || !payload['actor_issuer'].nil?
   end
 
-  # The join agencies implement (§8.5): events grouped by delegation_id, each
+  # The join a target agency implements: events grouped by delegation_id, each
   # group paired with the API decisions that carried the same delegation_id
   # in the assertion's `delegation_id` attribute.
   #

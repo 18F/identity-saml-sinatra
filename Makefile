@@ -12,6 +12,8 @@ test:
 
 lint:
 	@echo "--- rubocop ---"
+	bundle exec rubocop
+	@echo "--- bundler-audit ---"
 	bundle exec bundler-audit check --update
 	npm audit --audit-level=high
 
