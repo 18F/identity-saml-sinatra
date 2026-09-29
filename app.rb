@@ -63,6 +63,11 @@ class RelyingParty < Sinatra::Base
 
   # rubocop:disable Metrics/BlockLength
   helpers do
+    # HTML-escape values that came from assertions or Attempts events.
+    def h(text)
+      Rack::Utils.escape_html(text.to_s)
+    end
+
     def ial_select_options
       options = [
         ['sp', 'Service Provider setting'],
@@ -277,6 +282,15 @@ class RelyingParty < Sinatra::Base
     json_response(benefits_payload(assertion, record))
   rescue DemoBenefits::InvalidChange => e
     halt_json(400, 'invalid_request', e.message)
+  end
+
+  # Every decision the API made (REF-IMPL-2), newest first.
+  get '/decisions' do
+    erb :decisions, locals: { decisions: settings.decision_log.entries }
+  end
+
+  get '/decisions.json' do
+    json_response(decisions: settings.decision_log.entries.map(&:to_h))
   end
 
   get '/failure_to_proof' do

@@ -124,7 +124,7 @@ module DelegatedAssertionFactory
     scd_attrs = scd.map { |k, v| "#{k}=\"#{v}\"" }.join(' ')
 
     attr_xml = attributes.map do |name, value|
-      values = Array(value).map { |v| "<AttributeValue>#{v}</AttributeValue>" }.join
+      values = Array(value).map { |v| "<AttributeValue>#{v.to_s.encode(xml: :text)}</AttributeValue>" }.join
       "<Attribute Name=\"#{name}\" NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:uri\" " \
         "FriendlyName=\"#{name}\">#{values}</Attribute>"
     end.join

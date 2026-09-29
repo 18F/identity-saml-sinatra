@@ -1,0 +1,60 @@
+<%= erb :demo_banner %>
+<%= erb :header %>
+<main id="main-content">
+  <section class="grid-container usa-section">
+    <h1>API authorization decisions</h1>
+    <p class="usa-intro">
+      Every call to <code>/api/benefits</code> and what this resource server decided, newest first.
+      Held in memory (last <%= settings.rs_config.decision_log_size %>); also available as
+      <a href="/decisions.json">JSON</a>. The <code>delegation_id</code> column joins these
+      decisions to the Attempts API events on the
+      <a href="/attempts-api?tab=delegated">Delegated sessions</a> tab.
+    </p>
+    <p>
+      Validation is local: signature against the IdP metadata at
+      <code><%= h settings.rs_config.idp_metadata_url %></code>, Audience and Recipient must equal
+      <code><%= h settings.rs_config.resource_identifier %></code>. No call to Login.gov per request.
+    </p>
+    <% if decisions.empty? %>
+      <p>No decisions yet. Have the service provider exchange for a SAML assertion and call this API.</p>
+    <% else %>
+      <table class="usa-table usa-table--striped usa-table--compact">
+        <thead>
+          <tr>
+            <th scope="col">Time (UTC)</th>
+            <th scope="col">Route</th>
+            <th scope="col">Decision</th>
+            <th scope="col">Required scope</th>
+            <th scope="col">Actor (service provider)</th>
+            <th scope="col">delegation_id</th>
+            <th scope="col">Approved scopes</th>
+            <th scope="col">NameID / uuid</th>
+            <th scope="col">Assertion ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% decisions.each do |d| %>
+            <tr>
+              <td><%= d.time.utc.iso8601 %></td>
+              <td><code><%= h d.route %></code></td>
+              <td>
+                <% if d.decision == 'allow' %>
+                  <span class="usa-tag bg-green">allow</span>
+                <% else %>
+                  <span class="usa-tag bg-secondary">deny</span>
+                  <div class="font-mono-2xs"><%= h d.reason %></div>
+                <% end %>
+              </td>
+              <td><code><%= h d.required_scope %></code></td>
+              <td><%= h d.actor %></td>
+              <td><code><%= h d.delegation_id %></code></td>
+              <td><%= Array(d.delegation_scopes).map { |s| "<code>#{h s}</code>" }.join(' ') %></td>
+              <td class="font-mono-2xs"><%= h d.name_id %><% if d.uuid %><br><%= h d.uuid %><% end %></td>
+              <td class="font-mono-2xs"><%= h d.assertion_id %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+</main>
