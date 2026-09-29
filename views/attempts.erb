@@ -1,0 +1,57 @@
+<%= erb :demo_banner %>
+<%= erb :header %>
+<main id="main-content">
+  <section class="grid-container usa-section">
+    <h1>Attempts API (agency role)</h1>
+    <p class="usa-intro">
+      Events Login.gov delivered to <code><%= h settings.rs_config.issuer %></code>, polled from
+      <code><%= h settings.rs_config.attempts_url %></code> with this agency's credentials and
+      decrypted with its private key. Events with a <code>delegation_id</code> belong to a
+      delegated session; their <code>subject.session_id</code> will not match any session this
+      agency started.
+    </p>
+
+    <% if error %>
+      <div class="usa-alert usa-alert--error">
+        <div class="usa-alert__body">
+          <h4 class="usa-alert__heading">Attempts API error</h4>
+          <p class="usa-alert__text"><%= h error %></p>
+        </div>
+      </div>
+    <% end %>
+
+    <nav aria-label="Attempts views" class="margin-bottom-2">
+      <a href="/attempts-api" class="usa-button <%= tab == 'events' ? '' : 'usa-button--outline' %>">All events (<%= attempts_events.size %>)</a>
+      <a href="/attempts-api?tab=delegated" class="usa-button <%= tab == 'delegated' ? '' : 'usa-button--outline' %>">Delegated sessions</a>
+    </nav>
+
+    <% if tab == 'delegated' %>
+      <%= erb :delegated_sessions, locals: { sessions: } %>
+    <% else %>
+      <% if attempts_events.empty? %>
+        <p>No events waiting.</p>
+      <% else %>
+        <form action="/ack-events" method="post" class="margin-bottom-2">
+          <input type="hidden" name="jtis" value="<%= h attempts_events.map { |e| e['jti'] }.join(',') %>">
+          <button type="submit" class="usa-button usa-button--secondary">Acknowledge (delete) all events</button>
+        </form>
+        <table class="usa-table usa-table--striped usa-table--compact">
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">JTI</th>
+              <th scope="col">Issued at</th>
+              <th scope="col">delegation_id</th>
+              <th scope="col">Event data</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% attempts_events.sort_by { |e| e['iat'].to_i }.each do |attempt_event| %>
+              <%= erb :event, locals: { attempt_event: } %>
+            <% end %>
+          </tbody>
+        </table>
+      <% end %>
+    <% end %>
+  </section>
+</main>

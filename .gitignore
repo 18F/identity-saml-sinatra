@@ -46,3 +46,12 @@ build/
 public/api/deploy.json
 public/vendor
 node_modules
+
+# Never commit certificates or private keys created for this app; generate or
+# copy them in a setup step. The upstream sample app's demo key pair predates
+# this rule and stays tracked.
+config/*.key
+config/*.crt
+config/*.pem
+!config/demo_sp.key
+!config/demo_sp.crt

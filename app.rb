@@ -15,6 +15,8 @@ require_relative './delegated_assertion'
 require_relative './assertion_replay_cache'
 require_relative './decision_log'
 require_relative './demo_benefits'
+require_relative './attempts_configuration'
+require_relative './attempts_client'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
@@ -44,6 +46,52 @@ class RelyingParty < Sinatra::Base
   # attribute all carry it, and resource servers compare whole strings.
   BENEFITS_READ = 'token_exchange:benefits_read'
   BENEFITS_WRITE = 'token_exchange:benefits_write'
+
+  # Attempts API event fields shown in plain text; everything else is redacted
+  # unless allow_all_events_plaintext is set. The identity-oidc-sinatra list
+  # plus the delegated-access fields (§8.4) and the subject identifiers an
+  # agency needs to recognize a delegated session (§8.5).
+  ALLOWED_PLAINTEXT_KEYS = %w[
+    application_url
+    aws_region
+    client_port
+    client_user_agent
+    email_already_registered
+    failure_reason
+    language
+    mfa_device_type
+    occurred_at
+    otp_delivery_method
+    rate_limit_type
+    reauthentication
+    reproof
+    resend
+    success
+    unique_session_id
+    user_agent
+    subject_type
+    session_id
+    actor_issuer
+    scopes
+    resources
+    remembered
+    ial
+    aal
+    delegation_id
+    reason
+    token_format
+    resource
+  ].freeze
+
+  # Event types added for delegated access (§8.4). Any event carrying a
+  # delegation_id belongs to a delegated session, including the existing
+  # sign-in event types re-mapped to the target agency.
+  DELEGATED_EVENT_TYPES = %w[
+    delegated-access-consented
+    delegated-access-token-issued
+    delegated-access-token-refreshed
+    delegated-access-revoked
+  ].freeze
 
   # Raised by #bearer_token when the request carries no Bearer credentials.
   class MissingToken < StandardError; end
@@ -293,6 +341,31 @@ class RelyingParty < Sinatra::Base
     json_response(decisions: settings.decision_log.entries.map(&:to_h))
   end
 
+  # ===========================================================================
+  # Attempts API viewer in the agency role (§8.5, REF-IMPL-3). Polls with the
+  # agency's credentials; the "Delegated sessions" tab groups events by
+  # delegation_id and lists the API decisions carrying the same delegation_id.
+  # ===========================================================================
+  get '/attempts-api' do
+    tab = params[:tab] == 'delegated' ? 'delegated' : 'events'
+    events = attempts_events
+    erb :attempts, locals: {
+      tab:,
+      attempts_events: events,
+      sessions: tab == 'delegated' ? delegated_sessions(events) : {},
+      error: nil,
+    }
+  rescue AttemptsClient::Error, AttemptsConfiguration::Error, Faraday::ConnectionFailed,
+         Errno::ECONNREFUSED => e
+    erb :attempts, locals: { tab: 'events', attempts_events: [], sessions: {}, error: e.message }
+  end
+
+  post '/ack-events' do
+    jtis = params[:jtis].to_s.split(',').map(&:strip).reject(&:empty?)
+    attempts_events(ack: jtis) unless jtis.empty?
+    redirect to("/attempts-api#{params[:tab] == 'delegated' ? '?tab=delegated' : ''}")
+  end
+
   get '/failure_to_proof' do
     puts 'Failure to Proof :('
     session[:error_type] = 'Proofing failure'
@@ -468,6 +541,83 @@ class RelyingParty < Sinatra::Base
         attributes: assertion.attributes,
       },
     }
+  end
+
+  # ---------------------------------------------------------------------------
+  # Attempts API helpers (agency role)
+  # ---------------------------------------------------------------------------
+
+  # Poll the Attempts API with this agency's credentials.
+  # @return [Array<Hash>] decrypted Security Event Tokens
+  def attempts_events(ack: nil)
+    config = settings.rs_config
+    signing_key = nil
+    if config.signed_events?
+      signing_key = AttemptsConfiguration.cached_attempts_public_key(AttemptsConfiguration.cached)
+    end
+    AttemptsClient.new(config, signing_key:).poll(ack:)
+  end
+
+  # The single event inside a SET: { "<event type URI>" => { subject:, occurred_at:, ... } }.
+  def event_type(event)
+    (event['events'] || {}).keys.first.to_s.split('/').last
+  end
+
+  def event_payload(event)
+    (event['events'] || {}).values.first || {}
+  end
+
+  def delegated_event?(event)
+    payload = event_payload(event)
+    DELEGATED_EVENT_TYPES.include?(event_type(event)) ||
+      !payload['delegation_id'].nil? || !payload['actor_issuer'].nil?
+  end
+
+  # The join agencies implement (§8.5): events grouped by delegation_id, each
+  # group paired with the API decisions that carried the same delegation_id
+  # in the assertion's `delegation_id` attribute.
+  #
+  # @return [Hash{String => Hash}] delegation_id => { events:, decisions:, actor_issuer:, ... }
+  def delegated_sessions(events)
+    grouped = events.select { |e| delegated_event?(e) && event_payload(e)['delegation_id'] }.
+      group_by { |e| event_payload(e)['delegation_id'] }
+
+    grouped.to_h do |delegation_id, group|
+      sorted = group.sort_by { |e| event_payload(e)['occurred_at'].to_f }
+      consent = sorted.find { |e| event_type(e) == 'delegated-access-consented' }
+      first_with = ->(key) { sorted.map { |e| event_payload(e)[key] }.compact.first }
+      [
+        delegation_id,
+        {
+          events: sorted,
+          decisions: settings.decision_log.for_delegation(delegation_id),
+          actor_issuer: first_with.call('actor_issuer'),
+          resources: event_payload(consent || {})['resources'] || first_with.call('resource'),
+          scopes: first_with.call('scopes'),
+          remembered: event_payload(consent || {})['remembered'],
+          revoked: sorted.any? { |e| event_type(e) == 'delegated-access-revoked' },
+        },
+      ]
+    end
+  end
+
+  # Redact event fields not in ALLOWED_PLAINTEXT_KEYS (recursively).
+  def event_data(payload)
+    return payload if settings.rs_config.allow_all_events_plaintext?
+
+    redact_data(payload)
+  end
+
+  def redact_data(data)
+    data.to_h do |key, value|
+      if value.is_a?(Hash)
+        [key, redact_data(value)]
+      elsif ALLOWED_PLAINTEXT_KEYS.include?(key.to_s)
+        [key, value]
+      else
+        [key, 'REDACTED']
+      end
+    end
   end
 
   def get_param(key, acceptable_values)

@@ -1,0 +1,22 @@
+<tr>
+  <td>
+    <% type = event_type(attempt_event) %>
+    <% if DELEGATED_EVENT_TYPES.include?(type) %>
+      <strong><%= h type %></strong>
+    <% else %>
+      <%= h type %>
+    <% end %>
+  </td>
+  <td class="font-mono-2xs">
+    <%= h attempt_event['jti'] %>
+    <form action="/ack-events" method="post">
+      <input type="hidden" name="jtis" value="<%= h attempt_event['jti'] %>">
+      <button type="submit" class="usa-button usa-button--unstyled">Acknowledge</button>
+    </form>
+  </td>
+  <td><%= Time.at(attempt_event['iat'].to_i).utc.iso8601 %></td>
+  <td><code><%= h event_payload(attempt_event)['delegation_id'] %></code></td>
+  <td style="max-width: 480px; overflow-wrap: anywhere;">
+    <pre class="font-mono-2xs"><%= h JSON.pretty_generate(event_data(event_payload(attempt_event))) %></pre>
+  </td>
+</tr>
