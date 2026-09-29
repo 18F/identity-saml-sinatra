@@ -7,9 +7,59 @@ require 'sinatra/base'
 require 'uri'
 require 'yaml'
 require 'active_support/core_ext/object/to_query'
+require 'json'
+
+require_relative './resource_server_config'
+require_relative './idp_metadata'
+require_relative './delegated_assertion'
+require_relative './assertion_replay_cache'
+require_relative './decision_log'
+require_relative './demo_benefits'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
+
+  # --- Delegated-access resource server state (requirements §15.7, Appendix D step 19) ---
+  # These live on the class so every request shares them within the process.
+  set :rs_config, ResourceServerConfig.new
+  set :decision_log, DecisionLog.new(max_size: rs_config.decision_log_size)
+  set :replay_cache, AssertionReplayCache.new
+  set :benefits, DemoBenefits.new
+
+  # IdP metadata is fetched lazily on the first API call so the app boots
+  # without the IdP and so tests can point IDP_METADATA_URL at a stub.
+  def self.idp_metadata
+    @idp_metadata ||= IdpMetadata.new(
+      url: rs_config.idp_metadata_url,
+      cache_seconds: rs_config.idp_metadata_cache_seconds,
+    )
+  end
+
+  def self.reset_idp_metadata!
+    @idp_metadata = nil
+  end
+
+  # Scopes as they appear on the wire: the full `token_exchange:` form. The
+  # exchange response `scope`, introspection and the SAML `delegation_scopes`
+  # attribute all carry it, and resource servers compare whole strings.
+  BENEFITS_READ = 'token_exchange:benefits_read'
+  BENEFITS_WRITE = 'token_exchange:benefits_write'
+
+  # Raised by #bearer_token when the request carries no Bearer credentials.
+  class MissingToken < StandardError; end
+  # Raised by #bearer_token when there is a Bearer header but it is malformed.
+  class MalformedToken < StandardError; end
+
+  # Raised by #enforce_scope; carries the validated assertion for the decision log.
+  class InsufficientScope < StandardError
+    attr_reader :assertion, :required_scope
+
+    def initialize(assertion, required_scope)
+      @assertion = assertion
+      @required_scope = required_scope
+      super("delegation_scopes does not include #{required_scope}")
+    end
+  end
 
   # rubocop:disable Metrics/BlockLength
   helpers do
@@ -200,6 +250,35 @@ class RelyingParty < Sinatra::Base
     end
   end
 
+
+  # ===========================================================================
+  # Delegated-access API (§15.7). The service provider calls these with the
+  # SAML assertion Login.gov's token exchange issued for this resource server.
+  # ===========================================================================
+
+  # Reads require the read capability the user approved for this API.
+  get '/api/benefits' do
+    assertion = authorize!(BENEFITS_READ)
+    record = settings.benefits.record_for(assertion.name_id)
+    json_response(benefits_payload(assertion, record))
+  end
+
+  # Writes require the read_write capability. The scope check *is* the policy:
+  # a delegation with only benefits_read gets 403 insufficient_scope here.
+  post '/api/benefits' do
+    assertion = authorize!(BENEFITS_WRITE)
+    changes = parse_json_body
+    record = settings.benefits.update(
+      assertion.name_id,
+      changes,
+      actor: assertion.actor,
+      delegation_id: assertion.delegation_id,
+    )
+    json_response(benefits_payload(assertion, record))
+  rescue DemoBenefits::InvalidChange => e
+    halt_json(400, 'invalid_request', e.message)
+  end
+
   get '/failure_to_proof' do
     puts 'Failure to Proof :('
     session[:error_type] = 'Proofing failure'
@@ -208,6 +287,174 @@ class RelyingParty < Sinatra::Base
   end
 
   private
+
+
+  # ---------------------------------------------------------------------------
+  # Authorization for delegated API calls: one method per protocol step.
+  # ---------------------------------------------------------------------------
+
+  # Authorize the current request for `required_scope`, or halt with an
+  # RFC 6750 §3 error response. Steps, in order:
+  #
+  #   bearer_token                RFC 6750 §2.1  Authorization: Bearer <access_token>
+  #   DelegatedAssertion.decode   RFC 8693 §3    base64url SAML 2.0 assertion
+  #   validate_assertion          §15.7 items 2, 3, 5  signature, Issuer, Recipient,
+  #                               Audience, both time windows, no InResponseTo;
+  #                               no call to Login.gov
+  #   enforce_scope               §15.7 item 4   delegation_scopes per endpoint
+  #   log_decision                REF-IMPL-2     record what was decided
+  #
+  # @return [DelegatedAssertion] the validated assertion
+  def authorize!(required_scope)
+    token = bearer_token
+    assertion = validate_assertion(DelegatedAssertion.decode(token))
+    enforce_scope(assertion, required_scope)
+    log_decision(assertion, required_scope:, decision: 'allow')
+    assertion
+  rescue MissingToken
+    log_decision(nil, required_scope:, decision: 'deny', reason: 'no bearer token')
+    # RFC 6750 §3.1: a request with no credentials gets the challenge and no error code.
+    halt_bearer_error(401, nil, 'Authorization: Bearer <delegated SAML assertion> required')
+  rescue MalformedToken => e
+    log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
+    halt_bearer_error(400, 'invalid_request', e.message)
+  rescue DelegatedAssertion::InvalidAssertion => e
+    log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
+    halt_bearer_error(401, 'invalid_token', e.message)
+  rescue InsufficientScope => e
+    log_decision(e.assertion, required_scope:, decision: 'deny', reason: e.message)
+    halt_bearer_error(403, 'insufficient_scope', e.message, scope: required_scope)
+  rescue IdpMetadata::FetchError => e
+    # Fail closed: without the IdP's certificate nothing can be verified.
+    log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
+    halt_json(503, 'temporarily_unavailable', e.message)
+  end
+
+  # RFC 6750 §2.1: the access token is sent in the Authorization header with
+  # the Bearer scheme (scheme name case-insensitive) in b64token syntax. The
+  # form-body (§2.2) and query (§2.3) methods are not accepted.
+  #
+  # @return [String] the token exactly as the service provider received it
+  def bearer_token
+    header = request.env['HTTP_AUTHORIZATION'].to_s
+    raise MissingToken unless header.match?(/\ABearer(\s|\z)/i)
+
+    match = header.match(%r{\ABearer\s+([A-Za-z0-9\-._~+/]+=*)\z}i)
+    raise MalformedToken.new('Bearer token is not b64token syntax (RFC 6750 §2.1)') if match.nil?
+
+    match[1]
+  end
+
+  # Validate the decoded XML locally against Login.gov's published metadata.
+  # See DelegatedAssertion for the individual checks.
+  #
+  # If the signature fails, Login.gov may have rotated its signing key (a new
+  # year's metadata); refresh the cached metadata once (rate limited) and retry.
+  def validate_assertion(xml)
+    build_assertion(xml).validate!
+  rescue DelegatedAssertion::SignatureError
+    raise unless self.class.idp_metadata.refresh_if_stale!
+
+    build_assertion(xml).validate!
+  end
+
+  def build_assertion(xml)
+    metadata = self.class.idp_metadata
+    config = settings.rs_config
+    DelegatedAssertion.new(
+      xml,
+      resource_identifier: config.resource_identifier,
+      idp_certificates: metadata.signing_certificates,
+      idp_entity_id: metadata.entity_id,
+      private_key: config.rs_private_key,
+      clock_drift: config.allowed_clock_drift,
+      replay_cache: config.replay_protection? ? settings.replay_cache : nil,
+    )
+  end
+
+  # §15.7 item 4: the `delegation_scopes` attribute lists exactly the
+  # capabilities the user approved for this resource. Compare full strings.
+  def enforce_scope(assertion, required_scope)
+    return if assertion.delegation_scopes.include?(required_scope)
+
+    raise InsufficientScope.new(assertion, required_scope)
+  end
+
+  # Record the decision (REF-IMPL-2 "shows every decision it made"). When the
+  # assertion did not validate, only the reason is recorded: nothing read from
+  # an unverified assertion is trusted enough to log as fact.
+  def log_decision(assertion, required_scope:, decision:, reason: nil)
+    settings.decision_log.record(
+      route: "#{request.request_method} #{request.path_info}",
+      decision:,
+      reason:,
+      required_scope:,
+      name_id: assertion&.name_id,
+      uuid: assertion&.attributes&.fetch('uuid', nil),
+      actor: assertion&.actor,
+      delegation_id: assertion&.delegation_id,
+      delegation_scopes: assertion&.delegation_scopes,
+      assertion_id: assertion&.assertion_id,
+    )
+  end
+
+  # RFC 6750 §3: WWW-Authenticate: Bearer with realm, error, error_description
+  # and (for insufficient_scope) the scope the route needs.
+  def halt_bearer_error(status, error, description, scope: nil)
+    challenge = ['Bearer realm="benefits-api"']
+    challenge << "error=\"#{error}\"" if error
+    challenge << "error_description=\"#{description.to_s.tr('"', "'")}\"" if description
+    challenge << "scope=\"#{scope}\"" if scope
+    headers['WWW-Authenticate'] = challenge.join(', ')
+    halt_json(status, error || 'unauthorized', description)
+  end
+
+  def halt_json(status, error, description)
+    content_type :json
+    halt status, { error:, error_description: description }.to_json
+  end
+
+  def json_response(payload)
+    content_type :json
+    payload.to_json
+  end
+
+  def parse_json_body
+    body = request.body.read
+    raise DemoBenefits::InvalidChange.new('request body must be JSON') if body.to_s.strip.empty?
+
+    JSON.parse(body)
+  rescue JSON::ParserError
+    raise DemoBenefits::InvalidChange.new('request body must be JSON')
+  end
+
+  # Response body for both routes. `delegated_access` is what a
+  # delegation-aware API reads (§15.7 item 4): the acting service provider,
+  # the delegation_id that joins to Attempts API events, and the approved
+  # scopes. `_assertion` is a demo affordance so the service provider's demo
+  # page can show what the API saw; a production API would not echo it.
+  def benefits_payload(assertion, record)
+    {
+      benefits: record,
+      delegated_access: {
+        actor: assertion.actor,
+        delegation_id: assertion.delegation_id,
+        delegation_scopes: assertion.delegation_scopes,
+      },
+      _assertion: {
+        id: assertion.assertion_id,
+        issuer: assertion.issuer,
+        name_id: assertion.name_id,
+        name_id_format: assertion.name_id_format,
+        subject_confirmation_not_on_or_after: assertion.subject_not_on_or_after.iso8601,
+        not_before: assertion.not_before.iso8601,
+        not_on_or_after: assertion.not_on_or_after.iso8601,
+        authn_instant: assertion.authn_instant,
+        authn_context_class_ref: assertion.authn_context_class_ref,
+        attributes: assertion.attributes,
+      },
+    }
+  end
 
   def get_param(key, acceptable_values)
     value = params[key]
