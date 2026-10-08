@@ -3,6 +3,13 @@
     <div class="h5 p2 bg-green white center">
       <span class="bold caps">Success!</span>
       <span>Your email is <strong><%= session[:email] %></strong>.</span>
+      <% if session[:third_party_initiated_hint] %>
+      <%# Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): the sign-in was started by a
+          third party. Only the opaque hint it sent is shown; the identity above came from the
+          SAML assertion, never from the hint. %>
+      <span class="block">This sign-in was started by a third party (third-party-initiated login,
+        hint <code><%= Rack::Utils.escape_html(session[:third_party_initiated_hint]) %></code>).</span>
+      <% end %>
       <% if session[:userid] %>
       <form action="/logout" method="POST">
         <button type="submit" class="btn btn-outline bg-white navy">Logout</button>

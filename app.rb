@@ -11,6 +11,13 @@
 #    user approved; /decisions shows every decision; /attempts-api
 #    is the agency-role Attempts API viewer that joins Login.gov's events to
 #    those decisions on delegation_id.
+# 3. Third-Party-Initiated Login, the relying-party side of OpenID Connect Core
+#    1.0 §4 (https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
+#    applied to this SAML service provider: a third party such as America.gov
+#    sends the user's browser to GET /initiate_login naming Login.gov as the
+#    issuer; this app verifies the issuer and the return address, then runs
+#    its ordinary SAML sign-in and, when it completes, sends the user back to
+#    the third party. Nothing is delegated: the agency signs the user in itself.
 #
 # Supporting files: resource_server_config.rb (env vars), idp_metadata.rb
 # (IdP signing certificates), delegated_assertion.rb (validation steps),
@@ -118,6 +125,11 @@ class RelyingParty < Sinatra::Base
 
   # Raised by #presented_token when the request carries no Bearer or DPoP credentials.
   class MissingToken < StandardError; end
+
+  # Longest `login_hint` accepted on a third-party-initiated login request. The hint is an opaque
+  # correlation value the third party minted (a UUID is 36 characters); it carries no identity and
+  # is only echoed back, so a generous but bounded length keeps it out of session-size trouble.
+  THIRD_PARTY_LOGIN_HINT_MAX_LENGTH = 128
   # Raised by #presented_token when there is a Bearer or DPoP header but it is malformed.
   class MalformedToken < StandardError; end
 
@@ -295,6 +307,54 @@ class RelyingParty < Sinatra::Base
     redirect to('/')
   end
 
+  # ===========================================================================
+  # Third-Party-Initiated Login (relying-party side)
+  # OpenID Connect Core 1.0 §4,
+  # https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin
+  #
+  # §4 defines the request a third party sends to a relying party's login
+  # initiation endpoint: `iss` (the issuer the RP should authenticate the user
+  # with), `login_hint` (an opaque hint the RP may use), and `target_link_uri`
+  # (where to send the user afterwards). The section is written for OpenID
+  # Connect RPs; this app is a SAML service provider, and the pattern applies
+  # unchanged because the initiation request says nothing about the sign-in
+  # protocol. What this endpoint starts is the same SAML AuthnRequest that
+  # /login_get sends today. Because the user already holds a Login.gov session
+  # from America.gov, Login.gov completes the sign-in without re-prompting.
+  # ===========================================================================
+
+  # GET /initiate_login?iss=...&login_hint=...&target_link_uri=...
+  get '/initiate_login/?' do
+    # §4: "The RP MUST verify that the iss ... is an issuer that it trusts."
+    # A forged iss could point this app at an attacker's IdP, so anything but the
+    # one Login.gov this app is configured for is refused before any redirect.
+    verify_third_party_issuer!(params['iss'])
+    # §4: the RP MUST verify target_link_uri "to prevent being used as an open
+    # redirector to external sites." Only an allow-listed origin is accepted.
+    target_link_uri = verify_target_link_uri!(params['target_link_uri'])
+    login_hint = third_party_login_hint(params['login_hint'])
+
+    # Remember the hand-off for this one sign-in. The hint is opaque to this app:
+    # it is never used to identify the user (the SAML assertion does that) and is
+    # only echoed back so the third party can match the return to its request.
+    session[:third_party_login] = {
+      'login_hint' => login_hint,
+      # The validated URL, kept as text so it serializes cleanly into the cookie session.
+      'target_link_uri' => target_link_uri.to_s,
+      'started_at' => Time.now.utc.iso8601,
+    }
+
+    # Start the ordinary SAML sign-in. The hint is deliberately not forwarded to
+    # Login.gov: §4 only permits it as a hint to the RP, and Login.gov identifies
+    # the user by its own session, not by anything a third party supplies.
+    puts 'Third-party-initiated login: starting SAML sign-in'
+    request_url = saml_auth_request.create(
+      saml_request_data('GET'),
+      { skip_encryption:, prompt: }.compact,
+    )
+    redirect to(request_url)
+  end
+
   post '/consume/?' do
     response = OneLogin::RubySaml::Response.new(
       params.fetch('SAMLResponse'), settings: saml_settings
@@ -307,6 +367,8 @@ class RelyingParty < Sinatra::Base
       if session.delete(:step_up_enabled)
         aal = session.delete(:step_up_aal)
 
+        # A pending third-party hand-off (session[:third_party_login]) survives
+        # the step-up round trip: the second /consume completes it below.
         redirect to("/login_get/?aal=#{aal}&ial=2")
       else
         session[:userid] = user_uuid
@@ -315,12 +377,26 @@ class RelyingParty < Sinatra::Base
         session[:attributes] = response.attributes.to_h.to_json
 
         puts 'SAML Success!'
+        # §4 flow, last step: when this sign-in was started by a third party,
+        # send the user back to the address verified at initiation. The identity
+        # established above came from the assertion alone; the hint is only echoed.
+        handoff = session.delete(:third_party_login)
+        if handoff
+          session[:third_party_initiated_hint] = handoff['login_hint']
+          redirect to(third_party_return_url(handoff, status: 'signed_in'))
+        end
         redirect to('/success')
       end
     else
       puts 'SAML Fail :('
       session[:error_type] = 'Authentication failure'
       session[:errors] = response.errors || ['Something unknown went wrong.']
+
+      # A failed sign-in also ends a third-party hand-off: the user goes back to
+      # the third party with status=failed rather than landing on this app's
+      # error page, and the hand-off is cleared so it cannot be completed later.
+      handoff = session.delete(:third_party_login)
+      redirect to(third_party_return_url(handoff, status: 'failed')) if handoff
 
       redirect to('/')
     end
@@ -736,6 +812,87 @@ class RelyingParty < Sinatra::Base
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Third-Party-Initiated Login helpers (OpenID Connect Core 1.0 §4)
+  # ---------------------------------------------------------------------------
+
+  # §4: the RP MUST verify that `iss` is an issuer it trusts. The third party
+  # (an OpenID Connect client of Login.gov) knows Login.gov by its OpenID
+  # Connect issuer identifier, which is the IdP's root URL. This app knows the
+  # same IdP by `idp_url`, the root from which its SAML endpoints and metadata
+  # URL are derived, so the two are compared directly (trailing slash ignored).
+  # Any other value, or a missing one, is refused with 400 before anything else
+  # happens: a redirect to an attacker-chosen "issuer" is exactly what §4 is
+  # guarding against.
+  def verify_third_party_issuer!(iss)
+    expected = settings.rs_config.idp_url.to_s.chomp('/')
+    return if iss.is_a?(String) && iss.chomp('/') == expected && !expected.empty?
+
+    puts "Third-party-initiated login refused: iss #{iss.inspect} is not #{expected}"
+    halt 400, third_party_error('iss must name the Login.gov issuer this service trusts')
+  end
+
+  # §4: the RP MUST verify `target_link_uri` to avoid being an open redirector.
+  # The value must be an absolute http(s) URL whose origin (scheme, host, port)
+  # exactly matches one entry of the configured allow-list. There are no
+  # wildcards, and a plain-http origin is honored only for the local
+  # development hosts, so a production allow-list is https-only.
+  # @return [URI::HTTP] the parsed, accepted URI
+  def verify_target_link_uri!(value)
+    uri = begin
+      URI.parse(value.to_s)
+    rescue URI::InvalidURIError
+      nil
+    end
+    allowed = uri.is_a?(URI::HTTP) && uri.host &&
+              settings.rs_config.third_party_target_link_allowlist.include?(origin_of(uri))
+    return uri if allowed
+
+    puts "Third-party-initiated login refused: target_link_uri #{value.inspect} not allow-listed"
+    halt 400, third_party_error('target_link_uri is not an allowed return address')
+  end
+
+  # scheme://host[:port], the unit the allow-list is expressed in. Default ports
+  # are dropped so "https://example.gov" and "https://example.gov:443" compare equal.
+  def origin_of(uri)
+    port = uri.port == uri.default_port ? '' : ":#{uri.port}"
+    "#{uri.scheme.downcase}://#{uri.host.downcase}#{port}"
+  end
+
+  # The hint is optional in §4 and opaque here. It is bounded in length and
+  # stripped so an oversized or whitespace-padded value cannot bloat the session
+  # or produce a mismatched echo.
+  def third_party_login_hint(value)
+    hint = value.to_s.strip
+    return nil if hint.empty?
+    return hint if hint.length <= THIRD_PARTY_LOGIN_HINT_MAX_LENGTH
+
+    halt 400, third_party_error('login_hint is too long')
+  end
+
+  # Builds the return redirect from the hand-off recorded at initiation. The
+  # URI was validated then, so it is reused as stored; this app only appends
+  # its own parameters (keeping any query the third party put on the URL):
+  #   login_hint  the third party's correlation value, echoed unchanged
+  #   iss         this agency's SAML issuer, so the third party knows who returned the user
+  #   status      signed_in or failed
+  def third_party_return_url(handoff, status:)
+    uri = URI.parse(handoff['target_link_uri'])
+    returned = {
+      'login_hint' => handoff['login_hint'],
+      'iss' => settings.rs_config.issuer,
+      'status' => status,
+    }.compact
+    existing = uri.query ? URI.decode_www_form(uri.query) : []
+    uri.query = URI.encode_www_form(existing + returned.to_a)
+    uri.to_s
+  end
+
+  def third_party_error(message)
+    content_type :json
+    { error: 'invalid_request', error_description: message }.to_json
+  end
+
   def get_param(key, acceptable_values)
     value = params[key]
     case value
@@ -752,6 +909,8 @@ class RelyingParty < Sinatra::Base
     session.delete(:attributes)
     session.delete(:step_up_enabled)
     session.delete(:step_up_aal)
+    session.delete(:third_party_login)
+    session.delete(:third_party_initiated_hint)
   end
 
   def saml_settings(ial: nil, aal: nil, requested_attributes: [], force_authn: false)

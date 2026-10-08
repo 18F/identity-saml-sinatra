@@ -47,6 +47,7 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 | Route | Role | Purpose |
 |---|---|---|
 | `GET /`, `/login_get`, `/login_post`, `POST /consume`, `/logout`, `/slo_logout` | direct sign-in | The original SAML service-provider sample |
+| `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party such as America.gov starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
 | `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof |
 | `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact`; same DPoP rule |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
@@ -64,6 +65,7 @@ Direct sign-in (unchanged from the original sample):
 | `idp_sso_target_url`, `idp_slo_target_url` | - | Login.gov's year-suffixed SSO/SLO endpoints |
 | `idp_cert_fingerprint` | - | Fingerprint of the IdP signing certificate for the browser flow |
 | `sp_cert`, `sp_private_key` | `config/demo_sp.crt`, `config/demo_sp.key` | Required explicitly when the IdP host is `login.gov` |
+| `THIRD_PARTY_TARGET_LINK_ALLOWLIST` | `http://localhost:9292` | Space-separated origins a third-party-initiated login may return the user to (`target_link_uri`). Exact origin match, no wildcards; plain `http` only for `localhost`/`127.0.0.1`. The default is the America.gov reference app (`identity-sts-sinatra`). `idp_url` (below) is also the only `iss` accepted. |
 
 Resource server (new):
 
@@ -110,6 +112,44 @@ this app as:
 An agency onboarding for real supplies the same things: its
 SAML issuer, the resource server identifier, `token_format: saml2`, a certificate for
 encryption, and one scope with plain-language content per capability.
+
+## Third-Party-Initiated Login (OpenID Connect Core 1.0 §4)
+
+[OpenID Connect Core 1.0 §4, Initiating Login from a Third Party](https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
+lets a party that is not the relying party ask the relying party to sign a user in. America.gov uses it
+when an agency must interact with the user directly in its own service rather than through a delegated
+token. §4 is written for OpenID Connect relying parties; this app is a **SAML** service provider, and the
+pattern applies without change because the initiation request says nothing about the sign-in protocol:
+what it starts here is the same SAML AuthnRequest `/login_get` sends today.
+
+How it differs from delegated access: nothing is exchanged and no token is issued to America.gov. This
+agency signs the user in itself, receives its own assertion and attributes under its own agreement, and
+gets its own Attempts API events and billing, exactly as for a direct visit. America.gov only supplies the
+starting point and gets the user back at the end.
+
+```
+America.gov ──► browser ──► GET /initiate_login?iss=<Login.gov>&login_hint=<UUID>&target_link_uri=<America.gov URL>
+       │
+       │   this app verifies iss (MUST, §4) ─── refused 400 unless it is the Login.gov this app trusts (idp_url)
+       │   this app verifies target_link_uri (MUST, §4) ─── refused 400 unless its origin is allow-listed
+       │   remembers {login_hint, target_link_uri} in the session, then
+       ├──► browser ──► Login.gov SAML SSO (ordinary AuthnRequest; the hint is NOT forwarded)
+       │                Login.gov already has the user's session from America.gov, so no re-prompt
+       ├──► browser ──► POST /consume with the SAML response, validated as always
+       └──► browser ──► <target_link_uri>?login_hint=<UUID>&iss=<this agency's SAML issuer>&status=signed_in
+                        (or status=failed); the hand-off is single use and cleared
+```
+
+The two checks §4 requires of the relying party, and why:
+
+| Check | Why |
+|---|---|
+| `iss` MUST equal an issuer this app trusts | A forged `iss` would send the user to an attacker's identity provider. The third party identifies Login.gov by its OpenID Connect issuer, the IdP root URL; this app knows the same IdP as `idp_url`, so the two are compared directly. |
+| `target_link_uri` MUST be verified | Otherwise the endpoint is an open redirector. Only an exact origin on `THIRD_PARTY_TARGET_LINK_ALLOWLIST` is accepted; the stored value is reused unchanged at return and this app appends its own parameters. |
+
+`login_hint` is opaque to this app: it is bounded in length, never used to identify the user (the SAML
+assertion does that), and only echoed back so America.gov can match the return to the request it made.
+The signed-in pages show that the session was started by a third party and the hint it sent.
 
 ## How a delegated call works
 
@@ -273,7 +313,7 @@ implement.
 
 | File | Purpose |
 |---|---|
-| `app.rb` | Sinatra app: direct sign-in routes, `/api/benefits`, `authorize!` steps, decision log and Attempts routes |
+| `app.rb` | Sinatra app: direct sign-in routes, `/initiate_login` (third-party-initiated login), `/api/benefits`, `authorize!` steps, decision log and Attempts routes |
 | `delegated_assertion.rb` | Assertion validation, one method per step |
 | `dpop_verifier.rb` | RFC 9449 DPoP proof checks for key-bound assertions, one method per check |
 | `idp_metadata.rb` | Fetch/cache IdP metadata; signing certificates and entityID |

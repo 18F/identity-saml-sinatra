@@ -24,6 +24,13 @@
         <% if session[:attributes] %>
           <% userinfo = JSON.parse(session[:attributes]) %>
           <div class="p2 clearfix bg-white fg-black">
+            <% if session[:third_party_initiated_hint] %>
+              <%# OpenID Connect Core 1.0 §4: started by a third party; the hint is opaque and only echoed. %>
+              <p class="usa-alert usa-alert--info usa-alert--slim"><span class="usa-alert__text">
+                Signed in through third-party-initiated login (hint
+                <code><%= Rack::Utils.escape_html(session[:third_party_initiated_hint]) %></code>).
+              </span></p>
+            <% end %>
             <p>Received user info:</p>
             <ul>
               <% userinfo.each_pair do |key, vals| %>

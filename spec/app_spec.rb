@@ -416,6 +416,143 @@ RSpec.describe RelyingParty do
     end
   end
 
+  describe 'third-party-initiated login (OpenID Connect Core 1.0 §4)' do
+    let(:login_hint) { '7a0b9b3e-6b2a-4a7f-9c3d-2f1e8d5c4b6a' }
+    let(:target_link_uri) { 'http://localhost:9292/third_party/return?agency=benefits' }
+
+    before do
+      ENV['idp_url'] = 'http://idp.example.com'
+      ENV.delete('THIRD_PARTY_TARGET_LINK_ALLOWLIST')
+    end
+
+    def initiate(overrides = {})
+      query = {
+        iss: 'http://idp.example.com',
+        login_hint: login_hint,
+        target_link_uri: target_link_uri,
+      }.merge(overrides).compact
+      get "/initiate_login?#{URI.encode_www_form(query)}"
+    end
+
+    it 'refuses a request without iss' do
+      initiate(iss: nil)
+      expect(last_response.status).to eq(400)
+      expect(JSON.parse(last_response.body)['error']).to eq('invalid_request')
+      expect(last_request.session[:third_party_login]).to be_nil
+    end
+
+    it 'refuses an iss that is not the Login.gov this app trusts' do
+      initiate(iss: 'https://evil.example.com')
+      expect(last_response.status).to eq(400)
+      expect(last_response.body).to include('iss must name the Login.gov issuer')
+    end
+
+    it 'refuses a target_link_uri whose origin is not allow-listed (open redirect)' do
+      initiate(target_link_uri: 'https://attacker.example.com/steal')
+      expect(last_response.status).to eq(400)
+      expect(last_response.body).to include('target_link_uri is not an allowed return address')
+    end
+
+    it 'refuses a plain-http target that is not a local development host' do
+      ENV['THIRD_PARTY_TARGET_LINK_ALLOWLIST'] = 'http://america.example.gov'
+      initiate(target_link_uri: 'http://america.example.gov/return')
+      expect(last_response.status).to eq(400)
+    end
+
+    it 'refuses an oversized login_hint' do
+      initiate(login_hint: 'x' * 129)
+      expect(last_response.status).to eq(400)
+    end
+
+    it 'starts the ordinary SAML sign-in and remembers the hand-off' do
+      initiate
+      expect(last_response).to be_redirect
+      expect(URI(last_response.location).path).to eq('/api/saml/auth')
+      expect(URI(last_response.location).query).to include('SAMLRequest=')
+      handoff = last_request.session[:third_party_login]
+      expect(handoff['login_hint']).to eq(login_hint)
+      expect(handoff['target_link_uri']).to eq(target_link_uri)
+    end
+
+    it 'ignores a trailing slash on iss and accepts a configured https origin' do
+      ENV['THIRD_PARTY_TARGET_LINK_ALLOWLIST'] = 'https://america.example.gov http://localhost:9292'
+      initiate(iss: 'http://idp.example.com/', target_link_uri: 'https://america.example.gov/return')
+      expect(last_response).to be_redirect
+    end
+
+    describe 'completing the hand-off at /consume' do
+      let(:response) do
+        instance_double(
+          OneLogin::RubySaml::Response,
+          name_id: 'DUMMY_NAME_ID',
+          # Real ruby-saml attributes are multi-valued; the index page iterates each value.
+          attributes: { 'email' => ['subscriber@example.com'] },
+          errors: ['bad signature'],
+          authn_instant: Time.now.utc,
+        )
+      end
+
+      before do
+        allow(OneLogin::RubySaml::Response).to receive(:new).and_return(response)
+        allow(response).to receive(:is_valid?).and_return(valid_response)
+        initiate
+      end
+
+      context 'when the SAML response is valid' do
+        let(:valid_response) { true }
+
+        it 'sends the user back to target_link_uri with the same hint, this issuer and status' do
+          post 'consume?SAMLResponse=something'
+
+          expect(last_response).to be_redirect
+          location = URI(last_response.location)
+          expect("#{location.scheme}://#{location.host}:#{location.port}#{location.path}").
+            to eq('http://localhost:9292/third_party/return')
+          returned = URI.decode_www_form(location.query).to_h
+          expect(returned).to include(
+            'agency' => 'benefits',
+            'login_hint' => login_hint,
+            'iss' => 'urn:gov:gsa:SAML:2.0.profiles:sp:sso:localhost',
+            'status' => 'signed_in',
+          )
+          # Identity came from the assertion; the hand-off is consumed and only the notice remains.
+          expect(last_request.session[:userid]).to eq('DUMMY_NAME_ID')
+          expect(last_request.session[:third_party_login]).to be_nil
+          expect(last_request.session[:third_party_initiated_hint]).to eq(login_hint)
+        end
+
+        it 'does not redirect to the third party again on a later sign-in' do
+          post 'consume?SAMLResponse=something'
+          post 'consume?SAMLResponse=something'
+          expect(URI(last_response.location).path).to eq('/success')
+        end
+
+        it 'shows the third-party notice on the signed-in page' do
+          post 'consume?SAMLResponse=something'
+          get '/success'
+          follow_redirect!
+          expect(last_response.body).to include('third-party-initiated login')
+          expect(last_response.body).to include(login_hint)
+        end
+      end
+
+      context 'when the SAML response is invalid' do
+        let(:valid_response) { false }
+
+        it 'sends the user back with status=failed and clears the hand-off' do
+          post 'consume?SAMLResponse=something'
+
+          expect(last_response).to be_redirect
+          returned = URI.decode_www_form(URI(last_response.location).query).to_h
+          expect(returned['status']).to eq('failed')
+          expect(returned['login_hint']).to eq(login_hint)
+          expect(last_request.session[:third_party_login]).to be_nil
+          expect(last_request.session[:userid]).to be_nil
+        end
+      end
+    end
+  end
+
   describe 'failure_to_proof' do
     it 'shows the failure to proof page' do
       get '/failure_to_proof'

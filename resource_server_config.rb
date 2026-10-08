@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'openssl'
+require 'uri'
 
 # Configuration for the agency resource-server role of this sample app.
 #
@@ -71,6 +72,31 @@ class ResourceServerConfig
   # for twice this, after which the proof would be too old to pass anyway.
   def dpop_iat_leeway_seconds
     ENV.fetch('DPOP_IAT_LEEWAY_SECONDS', '60').to_i
+  end
+
+  # Origins a Third-Party-Initiated Login request may name in `target_link_uri`
+  # (OpenID Connect Core 1.0 §4,
+  # https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin).
+  # §4 requires the relying party to verify this value so it cannot be used as
+  # an open redirector; this app accepts only an exact origin match against
+  # this list. Space-separated `scheme://host[:port]` values, no wildcards.
+  # Plain http is honored only for local development hosts; anything else must
+  # be https. The default is the America.gov reference app (identity-sts-sinatra).
+  #
+  # @return [Array<String>] normalized origins
+  def third_party_target_link_allowlist
+    entries = ENV.fetch('THIRD_PARTY_TARGET_LINK_ALLOWLIST', 'http://localhost:9292').split
+    entries.filter_map do |entry|
+      uri = URI.parse(entry)
+      next unless uri.is_a?(URI::HTTP) && uri.host
+      # http is a development convenience, never a production return address.
+      next if uri.scheme == 'http' && !%w[localhost 127.0.0.1].include?(uri.host.downcase)
+
+      port = uri.port == uri.default_port ? '' : ":#{uri.port}"
+      "#{uri.scheme.downcase}://#{uri.host.downcase}#{port}"
+    rescue URI::InvalidURIError
+      nil
+    end
   end
 
   # Number of authorization decisions kept in memory for GET /decisions.
