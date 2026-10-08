@@ -117,7 +117,7 @@ encryption, and one scope with plain-language content per capability.
 Service provider ── POST /api/openid_connect/token (token-exchange, requested_token_type=saml2) ──► Login.gov
                  ◄── { access_token: <base64url EncryptedAssertion>, token_type: N_A, ... } ──────
 Service provider ── GET /api/benefits  Authorization: Bearer <access_token> ──────────────────────► this app
-                 ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound }, _assertion }
+                 ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound, dpop_jkt }, _assertion }
 ```
 
 When the service provider proved possession of a key at the exchange (RFC 9449 DPoP), Login.gov
@@ -207,8 +207,8 @@ attribute. This app enforces the binding (`dpop_verifier.rb`, one method per che
 
 A missing or failing proof is `401` with `WWW-Authenticate: DPoP algs="ES256 RS256",
 error="invalid_dpop_proof"`. Unbound assertions are unaffected and keep working as plain
-bearer tokens. The `delegated_access.key_bound` field in responses and the `DPoP` tag at
-`/decisions` show which calls were key-bound.
+bearer tokens. The `delegated_access.key_bound` and `delegated_access.dpop_jkt` fields in responses and the
+`DPoP` tag at `/decisions` show which calls were key-bound and to which key.
 
 Agency checklist for key-bound assertions: read `dpop_jkt` only after the signature verifies;
 require the `DPoP` scheme when it is present and refuse `Bearer`; verify a fresh proof on

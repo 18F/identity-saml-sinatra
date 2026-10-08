@@ -140,6 +140,9 @@ class DelegatedAssertion
     check_subject
     check_conditions
     read_attributes
+    # Key binding comes after the signature (so `dpop_jkt` is trusted) and
+    # before replay (so a bad proof does not consume this assertion's one
+    # presentation; the service provider can retry with a correct proof).
     check_key_binding
     check_replay
     self
@@ -422,16 +425,26 @@ class DelegatedAssertion
   # has verified (so `dpop_jkt` can be trusted) and before the replay check (so
   # a bad proof does not burn the assertion for a later, correct retry).
   def check_key_binding
+    # Unit tests of the assertion alone pass no presentation; the app always does.
     return if @presentation.nil?
 
     scheme = @presentation[:scheme].to_s.downcase
     if bound?
+      # `dpop_jkt` was read in #read_attributes, which runs after
+      # #verify_signature, so by this point it is a value Login.gov signed, not
+      # one an attacker could have inserted to steer the check.
+      #
+      # A bound assertion sent as Bearer is refused outright (RFC 9449 §7.1):
+      # the holder has not shown they hold the key, and accepting it would make
+      # the binding optional, which is the same as having none.
       unless scheme == 'dpop'
         raise SchemeMismatch.new('key-bound assertion must be presented with the DPoP scheme')
       end
       raise InvalidProof.new('no DPoP verifier configured') if @dpop_verifier.nil?
 
       begin
+        # The verifier checks the proof against this exact request (method,
+        # URL, token) and against the thumbprint in the assertion (§4.3).
         @dpop_verifier.verify!(
           proof: @presentation[:dpop_proof],
           method: @presentation[:method],
@@ -440,9 +453,14 @@ class DelegatedAssertion
           expected_jkt: dpop_jkt,
         )
       rescue DpopVerifier::InvalidProof => e
+        # Re-raised as an assertion error so the caller maps it to the
+        # `invalid_dpop_proof` challenge (§7.1) alongside the other outcomes.
         raise InvalidProof.new(e.message)
       end
     elsif scheme == 'dpop'
+      # An unbound assertion sent as DPoP is also refused: there is no
+      # thumbprint to verify a proof against, so the DPoP scheme would be
+      # claiming a binding that does not exist (RFC 9449 §7.1).
       raise SchemeMismatch.new('assertion is not key-bound; present it with the Bearer scheme')
     end
   end

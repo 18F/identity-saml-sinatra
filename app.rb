@@ -418,6 +418,9 @@ class RelyingParty < Sinatra::Base
   #
   # @return [DelegatedAssertion] the validated assertion
   def authorize!(required_scope)
+    # The scheme is read here but judged later: whether Bearer or DPoP is the
+    # right one depends on the assertion's `dpop_jkt`, which can only be trusted
+    # after its signature has been verified inside validate_assertion.
     token, scheme = presented_token
     assertion = validate_assertion(DelegatedAssertion.decode(token), token:, scheme:)
     enforce_scope(assertion, required_scope)
@@ -437,6 +440,11 @@ class RelyingParty < Sinatra::Base
     log_decision(nil, required_scope:, decision: 'deny', reason: e.message, key_bound: true)
     halt_dpop_error(401, 'invalid_dpop_proof', e.message)
   rescue DelegatedAssertion::SchemeMismatch => e
+    # Either a bound assertion arrived as Bearer or an unbound one arrived as
+    # DPoP (RFC 9449 §7.1). Both are `invalid_token`: the credential as
+    # presented is not acceptable, though the assertion itself may be fine.
+    # The reason text starts with "key-bound" only in the first case, which is
+    # what the decision log's key_bound column records.
     log_decision(nil, required_scope:, decision: 'deny', reason: e.message,
                       key_bound: e.message.start_with?('key-bound'))
     halt_dpop_error(401, 'invalid_token', e.message)
@@ -463,11 +471,15 @@ class RelyingParty < Sinatra::Base
   # @return [Array(String, String)] the token exactly as presented, and the scheme
   def presented_token
     header = request.env['HTTP_AUTHORIZATION'].to_s
+    # No recognized scheme at all: the challenge-only 401 (RFC 6750 §3.1).
     raise MissingToken unless header.match?(/\A(Bearer|DPoP)(\s|\z)/i)
 
+    # b64token (RFC 6750 §2.1): one run of token characters, optional padding.
     match = header.match(%r{\A(Bearer|DPoP)\s+([A-Za-z0-9\-._~+/]+=*)\z}i)
     raise MalformedToken.new('token is not b64token syntax (RFC 6750 §2.1)') if match.nil?
 
+    # match[2] is the token exactly as sent; the DPoP `ath` check hashes this
+    # string, so it must not be normalized or decoded here.
     [match[2], match[1]]
   end
 
@@ -503,14 +515,25 @@ class RelyingParty < Sinatra::Base
       presentation: {
         scheme:,
         token:,
+        # Rack exposes the DPoP header as HTTP_DPOP; nil when absent.
         dpop_proof: request.env['HTTP_DPOP'],
         method: request.request_method,
+        # `htu` must equal the URL the service provider called, without query
+        # or fragment (RFC 9449 §4.3 (9)). Behind a TLS-terminating proxy or
+        # gateway the app sees http://internal-host, but Rack's base_url
+        # follows X-Forwarded-Proto and X-Forwarded-Host, so this rebuilds the
+        # public URL. request.path excludes the query string.
         url: request.base_url + request.path,
       },
       dpop_verifier: dpop_verifier,
     )
   end
 
+  # One verifier per request, sharing the process-wide jti cache. The cache is
+  # a second AssertionReplayCache instance rather than the assertion one: both
+  # remember "seen until <time>" values, but they are separate policies (the
+  # assertion replay check is optional agency policy; the jti check is required
+  # by RFC 9449 §11.1) and must be clearable and configurable independently.
   def dpop_verifier
     config = settings.rs_config
     DpopVerifier.new(
@@ -539,6 +562,8 @@ class RelyingParty < Sinatra::Base
       decision:,
       reason:,
       required_scope:,
+      # With a validated assertion the binding is read from it; on a denial
+      # before validation finished, the caller says what it knows (may be nil).
       key_bound: assertion ? assertion.bound? : key_bound,
       name_id: assertion&.name_id,
       uuid: assertion&.attributes&.fetch('uuid', nil),
@@ -566,8 +591,11 @@ class RelyingParty < Sinatra::Base
   # error (`invalid_dpop_proof` for a bad or missing proof; `invalid_token`
   # when the scheme does not fit the token).
   def halt_dpop_error(status, error, description)
+    # Quotes inside the description would end the quoted-string early, so they
+    # are swapped for apostrophes, as the Bearer challenge does.
+    detail = description.to_s.tr('"', "'")
     headers['WWW-Authenticate'] =
-      "#{dpop_challenge}, error=\"#{error}\", error_description=\"#{description.to_s.tr('"', "'")}\""
+      "#{dpop_challenge}, error=\"#{error}\", error_description=\"#{detail}\""
     halt_json(status, error, description)
   end
 
@@ -597,9 +625,10 @@ class RelyingParty < Sinatra::Base
   # Response body for both routes. `delegated_access` is what a
   # delegation-aware API reads: the acting service provider,
   # the delegation_id that joins to Attempts API events, the approved
-  # scopes, and whether the assertion was key-bound (so the call carried a
-  # DPoP proof). `_assertion` is a demo affordance so the service provider's
-  # demo page can show what the API saw; a production API would not echo it.
+  # scopes, whether the assertion was key-bound (so the call carried a DPoP
+  # proof) and the bound key's thumbprint. `_assertion` is a demo affordance so
+  # the service provider's demo page can show what the API saw; a production
+  # API would not echo it.
   def benefits_payload(assertion, record)
     {
       benefits: record,
@@ -608,6 +637,9 @@ class RelyingParty < Sinatra::Base
         delegation_id: assertion.delegation_id,
         delegation_scopes: assertion.delegation_scopes,
         key_bound: assertion.bound?,
+        # The thumbprint the assertion is bound to (nil when unbound), so the
+        # service provider's demo page can confirm which key was checked.
+        dpop_jkt: assertion.dpop_jkt,
       },
       _assertion: {
         id: assertion.assertion_id,

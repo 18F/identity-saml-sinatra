@@ -41,6 +41,7 @@
               <td>
                 <% if d.decision == 'allow' %>
                   <span class="usa-tag bg-green">allow</span>
+                  <%# Key-bound assertions (dpop_jkt present) were checked with a DPoP proof. %>
                   <% if d.key_bound %><span class="usa-tag">DPoP</span><% end %>
                 <% else %>
                   <span class="usa-tag bg-secondary">deny</span>

@@ -61,6 +61,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
         'delegation_id' => 'del-0001',
         'delegation_scopes' => %w[token_exchange:benefits_read token_exchange:benefits_write],
         'key_bound' => false,
+        'dpop_jkt' => nil,
       )
       expect(body_json['_assertion']['name_id']).to eq('user-1')
       expect(body_json['_assertion']['issuer']).to eq(F::IDP_ENTITY_ID)
@@ -295,6 +296,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
 
       expect(last_response.status).to eq(200), last_response.body
       expect(body_json['delegated_access']['key_bound']).to eq(true)
+      expect(body_json['delegated_access']['dpop_jkt']).to eq(D.jkt)
       expect(body_json['_assertion']['attributes']['dpop_jkt']).to eq(D.jkt)
       expect(RelyingParty.settings.decision_log.entries.first.key_bound).to eq(true)
     end

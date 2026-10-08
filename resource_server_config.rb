@@ -58,13 +58,17 @@ class ResourceServerConfig
     ENV.fetch('REPLAY_PROTECTION', 'true') == 'true'
   end
 
-  # JWS algorithms accepted in a DPoP proof (RFC 9449 §4.2); asymmetric only.
-  # Advertised in the WWW-Authenticate DPoP challenge (§7.1).
+  # JWS algorithms accepted in a DPoP proof (RFC 9449 §4.2); asymmetric only,
+  # since a MAC algorithm would let anyone holding the "public" key forge
+  # proofs. Space-separated, in the form the WWW-Authenticate `algs` parameter
+  # uses (§7.1), so the same list is enforced and advertised.
   def dpop_allowed_algs
     ENV.fetch('DPOP_ALLOWED_ALGS', 'ES256 RS256').split
   end
 
-  # Seconds a DPoP proof's iat may differ from this server's clock (RFC 9449 §4.3 (10)).
+  # Seconds a DPoP proof's iat may differ from this server's clock, in either
+  # direction (RFC 9449 §4.3 (10)). Also sizes the jti cache: an entry is kept
+  # for twice this, after which the proof would be too old to pass anyway.
   def dpop_iat_leeway_seconds
     ENV.fetch('DPOP_IAT_LEEWAY_SECONDS', '60').to_i
   end
