@@ -2,6 +2,7 @@
 
 require 'spec_helper'
 require_relative '../delegated_assertion'
+require_relative '../dpop_verifier'
 require_relative '../assertion_replay_cache'
 require_relative '../idp_metadata'
 
@@ -139,6 +140,77 @@ RSpec.describe DelegatedAssertion do
       cache = AssertionReplayCache.new
       expect(cache.first_use?('x', expires_at: Time.now - 1)).to be(true)
       expect(cache.first_use?('x', expires_at: Time.now - 1)).to be(true)
+    end
+  end
+
+
+  describe 'key binding (RFC 9449)' do
+    let(:dpop) { DpopFactory }
+    let(:bound_attrs) { factory::DEFAULT_ATTRIBUTES.merge('dpop_jkt' => dpop.jkt) }
+    let(:url) { 'https://benefits-api.agency.localdev/api/benefits' }
+
+    def present(xml, token:, scheme:, proof:, method: 'GET', verifier: DpopVerifier.new)
+      validate(
+        xml,
+        presentation: { scheme:, token:, dpop_proof: proof, method:, url: },
+        dpop_verifier: verifier,
+      )
+    end
+
+    it 'exposes dpop_jkt and bound? and skips the check when no presentation is given' do
+      bound = validate(factory.sign(factory.assertion_xml(attributes: bound_attrs)))
+      expect(bound.dpop_jkt).to eq(dpop.jkt)
+      expect(bound).to be_bound
+
+      plain = validate(factory.sign(factory.assertion_xml))
+      expect(plain.dpop_jkt).to be_nil
+      expect(plain).not_to be_bound
+    end
+
+    it 'accepts a bound assertion with the DPoP scheme and a matching proof' do
+      xml = factory.sign(factory.assertion_xml(attributes: bound_attrs))
+      token = factory.encode(xml)
+      assertion = present(xml, token:, scheme: 'DPoP', proof: dpop.proof(token:, url:))
+      expect(assertion).to be_bound
+    end
+
+    it 'refuses a bound assertion presented as Bearer' do
+      xml = factory.sign(factory.assertion_xml(attributes: bound_attrs))
+      expect { present(xml, token: factory.encode(xml), scheme: 'Bearer', proof: nil) }.
+        to raise_error(DelegatedAssertion::SchemeMismatch, /DPoP scheme/)
+    end
+
+    it 'refuses an unbound assertion presented as DPoP' do
+      xml = factory.sign(factory.assertion_xml)
+      token = factory.encode(xml)
+      expect { present(xml, token:, scheme: 'DPoP', proof: dpop.proof(token:, url:)) }.
+        to raise_error(DelegatedAssertion::SchemeMismatch, /not key-bound/)
+    end
+
+    it 'maps verifier failures to InvalidProof' do
+      xml = factory.sign(factory.assertion_xml(attributes: bound_attrs))
+      token = factory.encode(xml)
+      expect { present(xml, token:, scheme: 'DPoP', proof: dpop.proof(token:, url:, key: dpop.other_ec_key)) }.
+        to raise_error(DelegatedAssertion::InvalidProof, /does not match the key/)
+    end
+
+    it 'does not trust dpop_jkt before the signature verifies' do
+      xml = factory.sign(factory.assertion_xml(attributes: bound_attrs), key: factory.rogue_key, cert: factory.rogue_cert)
+      token = factory.encode(xml)
+      expect { present(xml, token:, scheme: 'DPoP', proof: dpop.proof(token:, url:)) }.
+        to raise_error(DelegatedAssertion::SignatureError)
+    end
+
+    it 'checks the proof before recording the assertion ID for replay' do
+      cache = AssertionReplayCache.new
+      xml = factory.sign(factory.assertion_xml(attributes: bound_attrs))
+      token = factory.encode(xml)
+      expect do
+        validate(xml, replay_cache: cache,
+                      presentation: { scheme: 'DPoP', token:, dpop_proof: 'garbage', method: 'GET', url: },
+                      dpop_verifier: DpopVerifier.new)
+      end.to raise_error(DelegatedAssertion::InvalidProof)
+      expect(cache.size).to eq(0)
     end
   end
 

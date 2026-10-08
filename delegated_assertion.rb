@@ -6,6 +6,7 @@ require 'onelogin/ruby-saml'
 require 'rexml/document'
 require 'time'
 require 'xml_security'
+require_relative './dpop_verifier'
 
 # Validates a delegated SAML 2.0 assertion that a service provider presents to
 # this API as a bearer token, and exposes what the API needs from it.
@@ -30,7 +31,8 @@ require 'xml_security'
 #   check_issuer         SAML Core §2.2.5; Profiles §4.1.4.2
 #   check_subject        SAML Core §2.4.1.2 (bearer SubjectConfirmationData)
 #   check_conditions     SAML Core §2.5.1 (NotBefore/NotOnOrAfter), §2.5.1.4 (AudienceRestriction)
-#   read_attributes      delegation_scopes, delegation_id, actor attributes
+#   read_attributes      delegation_scopes, delegation_id, actor, dpop_jkt attributes
+#   check_key_binding    RFC 9449 §4.3, §7.1 (key-bound assertions: scheme and DPoP proof)
 #   check_replay         optional agency policy (see AssertionReplayCache)
 #
 # On any failure `InvalidAssertion` is raised with a reason suitable for
@@ -41,6 +43,12 @@ class DelegatedAssertion
   # Raised only for a signature that does not verify with the current IdP
   # certificates; the caller may refresh metadata once and retry.
   class SignatureError < InvalidAssertion; end
+  # A key-bound assertion was presented with the Bearer scheme, or an unbound
+  # one with the DPoP scheme (RFC 9449 §7.1): the token is refused as invalid.
+  class SchemeMismatch < InvalidAssertion; end
+  # The DPoP proof for a key-bound assertion was missing or did not verify
+  # (RFC 9449 §7.1 `invalid_dpop_proof`).
+  class InvalidProof < InvalidAssertion; end
 
   NAMESPACES = {
     'saml' => 'urn:oasis:names:tc:SAML:2.0:assertion',
@@ -63,15 +71,18 @@ class DelegatedAssertion
     XMLSecurity::Document::SHA512,
   ].freeze
 
-  # The token exchange appends three attributes to the agency's normal bundle.
-  # `delegation_scopes` (what the user approved) and `delegation_id` (the join
-  # key to Attempts events) are what make an assertion a delegated one and are
-  # required. `actor` names the service provider acting for the user (the SAML
-  # counterpart of the OAuth `act` claim, RFC 8693 §4.1); it is observed and
-  # logged, never a reason to reject on its own, so an API that also accepts
-  # assertions without it keeps working.
+  # The token exchange appends delegation attributes to the agency's normal
+  # bundle. `delegation_scopes` (what the user approved) and `delegation_id`
+  # (the join key to Attempts events) are what make an assertion a delegated
+  # one and are required. `actor` names the service provider acting for the
+  # user (the SAML counterpart of the OAuth `act` claim, RFC 8693 §4.1); it is
+  # observed and logged, never a reason to reject on its own, so an API that
+  # also accepts assertions without it keeps working. `dpop_jkt`, when present,
+  # is the RFC 7638 thumbprint of the key the assertion is bound to (RFC 9449):
+  # the service provider must then prove possession of that key on every
+  # request, and a copy of the assertion alone is useless.
   REQUIRED_DELEGATION_ATTRIBUTES = %w[delegation_scopes delegation_id].freeze
-  DELEGATION_ATTRIBUTES = (REQUIRED_DELEGATION_ATTRIBUTES + %w[actor]).freeze
+  DELEGATION_ATTRIBUTES = (REQUIRED_DELEGATION_ATTRIBUTES + %w[actor dpop_jkt]).freeze
 
   # Base64url-decode the `access_token` value (RFC 8693 §3: "a base64url-encoded
   # SAML 2.0 assertion"; RFC 4648 §5, no padding). Padding is tolerated.
@@ -98,9 +109,15 @@ class DelegatedAssertion
   # @param private_key [OpenSSL::PKey::RSA, nil] decrypts EncryptedAssertion
   # @param clock_drift [Integer] seconds of tolerance on every time comparison
   # @param replay_cache [AssertionReplayCache, nil] nil disables replay protection
+  # @param presentation [Hash, nil] how the token reached this API, for the
+  #   key-binding check: `scheme` (`Bearer` or `DPoP`), `token` (exactly as
+  #   presented), `dpop_proof` (the DPoP header, may be nil), `method`, `url`.
+  #   nil skips the check (unit tests of the assertion alone).
+  # @param dpop_verifier [DpopVerifier, nil] verifies the proof of a bound assertion
   # @param now [Time]
   def initialize(xml, resource_identifier:, idp_certificates:, idp_entity_id: nil,
-                 private_key: nil, clock_drift: 60, replay_cache: nil, now: Time.now.utc)
+                 private_key: nil, clock_drift: 60, replay_cache: nil, presentation: nil,
+                 dpop_verifier: nil, now: Time.now.utc)
     @xml = xml
     @resource_identifier = resource_identifier
     @idp_certificates = idp_certificates
@@ -108,6 +125,8 @@ class DelegatedAssertion
     @private_key = private_key
     @clock_drift = clock_drift
     @replay_cache = replay_cache
+    @presentation = presentation
+    @dpop_verifier = dpop_verifier
     @now = now
     @attributes = {}
   end
@@ -121,6 +140,7 @@ class DelegatedAssertion
     check_subject
     check_conditions
     read_attributes
+    check_key_binding
     check_replay
     self
   end
@@ -139,6 +159,18 @@ class DelegatedAssertion
   # `act` claim (RFC 8693 §4.1).
   def actor
     attributes['actor']
+  end
+
+  # RFC 7638 thumbprint of the key this assertion is bound to (RFC 9449), or
+  # nil for an ordinary bearer assertion.
+  def dpop_jkt
+    value = attributes['dpop_jkt']
+    value.is_a?(String) && !value.strip.empty? ? value.strip : nil
+  end
+
+  # Whether presenting this assertion requires a DPoP proof.
+  def bound?
+    !dpop_jkt.nil?
   end
 
   # The latest instant at which any validator would still accept this
@@ -378,6 +410,41 @@ class DelegatedAssertion
     @authn_context_class_ref = text(
       '/saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef',
     )
+  end
+
+  # --- step: key binding ----------------------------------------------------
+
+  # RFC 9449 §7.1: a key-bound assertion (one carrying `dpop_jkt`) must arrive
+  # with the DPoP scheme and a proof signed by the bound key; presented as a
+  # plain Bearer token it is invalid, because whoever holds it has not shown
+  # they hold the key. An unbound assertion presented with the DPoP scheme is
+  # equally wrong: there is no key to check against. Runs after the signature
+  # has verified (so `dpop_jkt` can be trusted) and before the replay check (so
+  # a bad proof does not burn the assertion for a later, correct retry).
+  def check_key_binding
+    return if @presentation.nil?
+
+    scheme = @presentation[:scheme].to_s.downcase
+    if bound?
+      unless scheme == 'dpop'
+        raise SchemeMismatch.new('key-bound assertion must be presented with the DPoP scheme')
+      end
+      raise InvalidProof.new('no DPoP verifier configured') if @dpop_verifier.nil?
+
+      begin
+        @dpop_verifier.verify!(
+          proof: @presentation[:dpop_proof],
+          method: @presentation[:method],
+          url: @presentation[:url],
+          access_token: @presentation[:token],
+          expected_jkt: dpop_jkt,
+        )
+      rescue DpopVerifier::InvalidProof => e
+        raise InvalidProof.new(e.message)
+      end
+    elsif scheme == 'dpop'
+      raise SchemeMismatch.new('assertion is not key-bound; present it with the Bearer scheme')
+    end
   end
 
   # --- step: replay ---------------------------------------------------------

@@ -41,6 +41,7 @@
               <td>
                 <% if d.decision == 'allow' %>
                   <span class="usa-tag bg-green">allow</span>
+                  <% if d.key_bound %><span class="usa-tag">DPoP</span><% end %>
                 <% else %>
                   <span class="usa-tag bg-secondary">deny</span>
                   <div class="font-mono-2xs"><%= h d.reason %></div>

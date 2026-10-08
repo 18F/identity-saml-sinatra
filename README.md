@@ -47,8 +47,8 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 | Route | Role | Purpose |
 |---|---|---|
 | `GET /`, `/login_get`, `/login_post`, `POST /consume`, `/logout`, `/slo_logout` | direct sign-in | The original SAML service-provider sample |
-| `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes` |
-| `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact` |
+| `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof |
+| `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact`; same DPoP rule |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
 | `GET /attempts-api` | agency | Attempts API events for this agency; `?tab=delegated` groups them by `delegation_id` with the matching API decisions |
 | `POST /ack-events` | agency | Acknowledge (delete) events by JTI |
@@ -77,6 +77,8 @@ Resource server (new):
 | `RS_PRIVATE_KEY_PATH` | `./config/demo_sp.key` | Decrypts `EncryptedAssertion`s (assertions are encrypted to the registered certificate) |
 | `ALLOWED_CLOCK_DRIFT` | `60` | Seconds of tolerance on every time comparison |
 | `REPLAY_PROTECTION` | `true` | Refuse a second presentation of the same assertion ID (see below) |
+| `DPOP_ALLOWED_ALGS` | `ES256 RS256` | JWS algorithms accepted in a DPoP proof; advertised in the `WWW-Authenticate` challenge |
+| `DPOP_IAT_LEEWAY_SECONDS` | `60` | Seconds a DPoP proof's `iat` may differ from this server's clock |
 | `DECISION_LOG_SIZE` | `200` | Entries kept for `/decisions` |
 
 Attempts API viewer (agency role):
@@ -115,16 +117,24 @@ encryption, and one scope with plain-language content per capability.
 Service provider ── POST /api/openid_connect/token (token-exchange, requested_token_type=saml2) ──► Login.gov
                  ◄── { access_token: <base64url EncryptedAssertion>, token_type: N_A, ... } ──────
 Service provider ── GET /api/benefits  Authorization: Bearer <access_token> ──────────────────────► this app
-                 ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes }, _assertion }
+                 ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound }, _assertion }
+```
+
+When the service provider proved possession of a key at the exchange (RFC 9449 DPoP), Login.gov
+adds a `dpop_jkt` attribute to the assertion and the call looks like this instead:
+
+```
+Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
+                                       DPoP: <proof JWT signed with the bound key> ──────────────► this app
 ```
 
 `authorize!(required_scope)` in `app.rb` runs one function per protocol step so that the code can be copied step by step:
 
 | Step | Function | Standard |
 |---|---|---|
-| Read the bearer token | `bearer_token` | RFC 6750 §2.1 |
+| Read the token and its scheme (`Bearer` or `DPoP`) | `presented_token` | RFC 6750 §2.1, RFC 9449 §7.1 |
 | Base64url-decode it | `DelegatedAssertion.decode` | RFC 8693 §3, RFC 4648 §5 |
-| Validate the assertion locally | `validate_assertion` → `DelegatedAssertion#validate!` | see below |
+| Validate the assertion locally, then the DPoP proof if it is key-bound | `validate_assertion` → `DelegatedAssertion#validate!` | see below |
 | Enforce the route's scope | `enforce_scope` | `delegation_scopes` attribute, compared as full strings |
 | Record the decision | `log_decision` | shown at `/decisions` |
 
@@ -157,8 +167,12 @@ Service provider ── GET /api/benefits  Authorization: Bearer <access_token> 
    it is not a delegated assertion. `actor` is the service provider's issuer, the SAML
    counterpart of the OAuth `act` claim (RFC 8693 §4.1); it is observed and logged when present
    but its absence alone is never a reason to reject, so an API that also accepts assertions
-   without it keeps working.
-8. `check_replay` — optional, see below.
+   without it keeps working. `dpop_jkt`, when present, is the RFC 7638 thumbprint of the key
+   the assertion is bound to.
+8. `check_key_binding` — see "Key-bound assertions" below. Runs here, after the signature has
+   verified (so `dpop_jkt` can be trusted) and before the replay check (so a bad proof does
+   not burn the assertion for a correct retry).
+9. `check_replay` — optional, see below.
 
 No step calls Login.gov. Metadata is fetched from `IDP_METADATA_URL` once and cached; a
 signature failure triggers at most one early re-fetch per minute so a rotated key is picked up.
@@ -166,7 +180,41 @@ signature failure triggers at most one early re-fetch per minute so a rotated ke
 Error responses follow RFC 6750 §3: `401` with `WWW-Authenticate: Bearer realm="benefits-api"`
 (no `error` when no credentials were sent; `error="invalid_token"` otherwise), `400
 invalid_request` for a malformed header, `403 insufficient_scope` with the `scope` the route
-needs, `503` if metadata cannot be fetched (fail closed).
+needs, `503` if metadata cannot be fetched (fail closed). Every challenge also carries
+`DPoP algs="ES256 RS256"` (RFC 9449 §7.1) so a service provider learns that key-bound tokens
+are accepted and which proof algorithms work.
+
+### Key-bound assertions (RFC 9449 DPoP)
+
+A delegated assertion is a bearer token: whoever holds it can use it for its five-minute
+window. A service provider that runs in a browser, or that wants a stolen assertion to be
+worthless, proves possession of a key pair when it exchanges with Login.gov. Login.gov then
+binds the family to that key and puts the key's RFC 7638 thumbprint in a `dpop_jkt`
+attribute. This app enforces the binding (`dpop_verifier.rb`, one method per check):
+
+| Check | Rule | Standard |
+|---|---|---|
+| Scheme | A bound assertion must arrive as `Authorization: DPoP <token>`; as `Bearer` it is `401 invalid_token`. An unbound assertion sent as `DPoP` is also `401 invalid_token`. | RFC 9449 §7.1 |
+| One proof | Exactly one `DPoP` header, a JWS with `typ: dpop+jwt`. | §4.2, §4.3 (1)–(3) |
+| Algorithm | `alg` in `DPOP_ALLOWED_ALGS` (default `ES256 RS256`); `none` and HMAC are refused. | §4.3 (4) |
+| Key | `jwk` header is a public key with no private members, of the type the `alg` needs. | §4.3 (5) |
+| Signature | Verifies with the embedded `jwk`. | §4.3 (6) |
+| `htm` / `htu` | Equal this request's method and URL (no query or fragment). `htu` is compared against `request.base_url + path`, which follows `X-Forwarded-Proto` and `X-Forwarded-Host`; behind a gateway that rewrites URLs, configure it to forward the public ones. | §4.3 (8)(9) |
+| `iat` | Within `DPOP_IAT_LEEWAY_SECONDS` (default 60) of now, either side. | §4.3 (10) |
+| `ath` | base64url SHA-256 of the token exactly as presented in `Authorization`. | §4.3 (12) |
+| Thumbprint | The `jwk` thumbprint equals the assertion's `dpop_jkt`. | §4.3 (13), RFC 7638 |
+| `jti` | Not seen before (in-memory cache, kept for twice the leeway). Recorded last, so a rejected proof never burns a value. | §11.1 |
+
+A missing or failing proof is `401` with `WWW-Authenticate: DPoP algs="ES256 RS256",
+error="invalid_dpop_proof"`. Unbound assertions are unaffected and keep working as plain
+bearer tokens. The `delegated_access.key_bound` field in responses and the `DPoP` tag at
+`/decisions` show which calls were key-bound.
+
+Agency checklist for key-bound assertions: read `dpop_jkt` only after the signature verifies;
+require the `DPoP` scheme when it is present and refuse `Bearer`; verify a fresh proof on
+every request (the cached result of one request never covers the next); keep a `jti` cache
+shared across instances in a multi-instance deployment; and make sure the URL your code
+compares `htu` against is the one the service provider called.
 
 ### Delegation-aware policy
 
@@ -227,6 +275,7 @@ implement.
 |---|---|
 | `app.rb` | Sinatra app: direct sign-in routes, `/api/benefits`, `authorize!` steps, decision log and Attempts routes |
 | `delegated_assertion.rb` | Assertion validation, one method per step |
+| `dpop_verifier.rb` | RFC 9449 DPoP proof checks for key-bound assertions, one method per check |
 | `idp_metadata.rb` | Fetch/cache IdP metadata; signing certificates and entityID |
 | `assertion_replay_cache.rb` | Optional replay protection |
 | `decision_log.rb` | Ring buffer behind `/decisions` |
@@ -234,6 +283,7 @@ implement.
 | `resource_server_config.rb` | Environment variables and defaults |
 | `attempts_client.rb`, `attempts_configuration.rb` | Attempts API polling, decryption, signature verification |
 | `spec/support/delegated_assertion_factory.rb` | Builds signed and encrypted test assertions with a runtime-generated IdP key pair |
+| `spec/support/dpop_factory.rb` | Builds DPoP proofs with runtime-generated service provider keys |
 
 ## Contributing
 

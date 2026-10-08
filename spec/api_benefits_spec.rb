@@ -7,6 +7,7 @@ require 'rspec'
 require 'rack/test'
 
 F = DelegatedAssertionFactory unless defined?(F)
+D = DpopFactory unless defined?(D)
 
 RSpec.describe 'delegated-access API (/api/benefits)' do
   include Rack::Test::Methods
@@ -17,6 +18,17 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
 
   def bearer(token)
     header 'Authorization', "Bearer #{token}"
+  end
+
+  # Present a key-bound token the RFC 9449 way: DPoP scheme plus a proof header.
+  def dpop(token, proof = D.proof(token:))
+    header 'Authorization', "DPoP #{token}"
+    header 'DPoP', proof if proof
+  end
+
+  # A signed assertion bound to the test service provider's key.
+  def bound_token(key: D.ec_key, **overrides)
+    F.token(attributes: F::DEFAULT_ATTRIBUTES.merge('dpop_jkt' => D.jkt(key)), **overrides)
   end
 
   def body_json
@@ -32,6 +44,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
     stub_request(:get, F::METADATA_URL).to_return(status: 200, body: F.metadata_xml)
     RelyingParty.reset_idp_metadata!
     RelyingParty.settings.replay_cache.clear
+    RelyingParty.settings.dpop_jti_cache.clear
     RelyingParty.settings.decision_log.clear
     RelyingParty.settings.benefits.clear
   end
@@ -47,6 +60,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
         'actor' => F::ACTOR,
         'delegation_id' => 'del-0001',
         'delegation_scopes' => %w[token_exchange:benefits_read token_exchange:benefits_write],
+        'key_bound' => false,
       )
       expect(body_json['_assertion']['name_id']).to eq('user-1')
       expect(body_json['_assertion']['issuer']).to eq(F::IDP_ENTITY_ID)
@@ -78,6 +92,8 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       expect(last_response.status).to eq(401)
       expect(last_response.headers['WWW-Authenticate']).to start_with('Bearer realm="benefits-api"')
       expect(last_response.headers['WWW-Authenticate']).not_to include('error=')
+      # RFC 9449 §7.1: the challenge also advertises DPoP and the accepted algorithms.
+      expect(last_response.headers['WWW-Authenticate']).to include('DPoP algs="ES256 RS256"')
     end
 
     it 'returns 401 invalid_token when the token is not base64url' do
@@ -266,6 +282,161 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
 
       expect(last_response.status).to eq(200), last_response.body
       expect(a_request(:get, F::METADATA_URL)).to have_been_made.twice
+    end
+  end
+
+
+  describe 'key-bound assertions (RFC 9449 DPoP)' do
+    let(:token) { bound_token(name_id: 'bound-1') }
+
+    it 'accepts a bound assertion presented with the DPoP scheme and a valid proof' do
+      dpop token
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(200), last_response.body
+      expect(body_json['delegated_access']['key_bound']).to eq(true)
+      expect(body_json['_assertion']['attributes']['dpop_jkt']).to eq(D.jkt)
+      expect(RelyingParty.settings.decision_log.entries.first.key_bound).to eq(true)
+    end
+
+    it 'accepts an RS256 proof when the assertion is bound to an RSA key' do
+      token = bound_token(key: D.rsa_key)
+      dpop token, D.proof(token:, key: D.rsa_key)
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(200), last_response.body
+    end
+
+    it 'binds the proof to the request: POST needs its own proof with htm POST' do
+      token = bound_token(name_id: 'bound-writer')
+      dpop token, D.proof(token:, method: 'POST')
+      post '/api/benefits', { preferred_contact: 'email' }.to_json, 'CONTENT_TYPE' => 'application/json'
+
+      expect(last_response.status).to eq(200), last_response.body
+      expect(body_json['benefits']['preferred_contact']).to eq('email')
+    end
+
+    it 'refuses a bound assertion presented as a plain Bearer token' do
+      bearer token
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(401)
+      expect(last_response.headers['WWW-Authenticate']).to start_with('DPoP algs="ES256 RS256"')
+      expect(last_response.headers['WWW-Authenticate']).to include('error="invalid_token"')
+      expect(body_json['error']).to eq('invalid_token')
+      expect(body_json['error_description']).to match(/DPoP scheme/)
+    end
+
+    it 'refuses the DPoP scheme without a DPoP header' do
+      dpop token, nil
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(401)
+      expect(last_response.headers['WWW-Authenticate']).to include('error="invalid_dpop_proof"')
+      expect(body_json['error']).to eq('invalid_dpop_proof')
+    end
+
+    it 'refuses an unbound assertion presented with the DPoP scheme' do
+      unbound = F.token
+      dpop unbound, D.proof(token: unbound)
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(401)
+      expect(body_json['error']).to eq('invalid_token')
+      expect(body_json['error_description']).to match(/not key-bound/)
+    end
+
+    it 'does not burn the assertion for replay when the proof was bad' do
+      dpop token, D.proof(token:, claims: { ath: 'wrong' })
+      get '/api/benefits'
+      expect(last_response.status).to eq(401)
+
+      dpop token
+      get '/api/benefits'
+      expect(last_response.status).to eq(200), last_response.body
+    end
+
+    {
+      'a proof whose ath is for a different token' => -> (t) { D.proof(token: 'another-token') },
+      'a proof for another URL (htu)' => -> (t) { D.proof(token: t, url: 'http://example.org/api/other') },
+      'a proof for another method (htm)' => -> (t) { D.proof(token: t, method: 'POST') },
+      'a stale proof (iat 5 minutes ago)' => -> (t) { D.proof(token: t, now: Time.now.to_i - 300) },
+      'a proof from the future (iat 5 minutes ahead)' => -> (t) { D.proof(token: t, now: Time.now.to_i + 300) },
+      'a proof without iat' => -> (t) { D.proof(token: t, claims: { iat: nil }) },
+      'a proof without jti' => -> (t) { D.proof(token: t, claims: { jti: nil }) },
+      'a proof signed with a key the assertion is not bound to' => -> (t) { D.proof(token: t, key: D.other_ec_key) },
+      'a proof without typ dpop+jwt' => -> (t) { D.proof(token: t, header: { typ: 'JWT' }) },
+      'a proof with alg none' => -> (t) { D.unsigned_proof(token: t) },
+      'a proof with a symmetric alg' => -> (t) { D.hmac_proof(token: t) },
+      'a proof whose jwk carries the private key' => lambda { |t|
+        D.proof(token: t, header: { jwk: JWT::JWK.new(D.ec_key).export(include_private: true).reject { |k, _| k == :kid } })
+      },
+      'a proof whose jwk does not match the signature' => lambda { |t|
+        D.proof(token: t, key: D.ec_key, header: { jwk: D.public_jwk(D.other_ec_key) })
+      },
+      'something that is not a JWT' => -> (_t) { 'not.a.jwt' },
+    }.each do |description, build_proof|
+      it "refuses #{description} with 401 invalid_dpop_proof" do
+        dpop token, build_proof.call(token)
+        get '/api/benefits'
+
+        expect(last_response.status).to eq(401), last_response.body
+        expect(last_response.headers['WWW-Authenticate']).to start_with('DPoP algs="ES256 RS256"')
+        expect(last_response.headers['WWW-Authenticate']).to include('error="invalid_dpop_proof"')
+        expect(body_json['error']).to eq('invalid_dpop_proof')
+      end
+    end
+
+    it 'refuses a replayed proof (same jti) even for a fresh assertion' do
+      ENV['REPLAY_PROTECTION'] = 'false'
+      proof = D.proof(token:)
+      dpop token, proof
+      get '/api/benefits'
+      expect(last_response.status).to eq(200), last_response.body
+
+      dpop token, proof
+      get '/api/benefits'
+      expect(last_response.status).to eq(401)
+      expect(body_json['error']).to eq('invalid_dpop_proof')
+      expect(body_json['error_description']).to match(/already been used/)
+    end
+
+    it 'refuses more than one DPoP header' do
+      dpop token, "#{D.proof(token:)}, #{D.proof(token:)}"
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(401)
+      expect(body_json['error_description']).to match(/more than one/)
+    end
+
+    it 'compares htu against the URL the service provider called, including forwarded scheme and host' do
+      header 'X-Forwarded-Proto', 'https'
+      header 'X-Forwarded-Host', 'benefits-api.agency.localdev'
+      dpop token, D.proof(token:, url: 'https://benefits-api.agency.localdev/api/benefits')
+      get '/api/benefits?trace=1'
+
+      expect(last_response.status).to eq(200), last_response.body
+    end
+
+    it 'keeps assertion replay protection independent of DPoP' do
+      dpop token
+      get '/api/benefits'
+      expect(last_response.status).to eq(200)
+
+      dpop token, D.proof(token:)
+      get '/api/benefits'
+      expect(last_response.status).to eq(401)
+      expect(body_json['error_description']).to match(/already been presented/)
+    end
+
+    it 'reports the DPoP denial reason at /decisions' do
+      bearer token
+      get '/api/benefits'
+
+      entry = RelyingParty.settings.decision_log.entries.first
+      expect(entry.decision).to eq('deny')
+      expect(entry.key_bound).to eq(true)
+      expect(entry.reason).to match(/DPoP scheme/)
     end
   end
 

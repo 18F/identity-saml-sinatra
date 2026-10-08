@@ -4,15 +4,18 @@
 #    /consume, /logout, /slo_logout. Unchanged.
 # 2. SAML resource server for delegated access: a third-party service provider
 #    obtains a SAML 2.0 assertion for this API from Login.gov's token exchange
-#    (RFC 8693) and presents it as a bearer token (RFC 6750). GET/POST
-#    /api/benefits validate it locally (DelegatedAssertion) and enforce the
-#    scopes the user approved; /decisions shows every decision; /attempts-api
+#    (RFC 8693) and presents it as a bearer token (RFC 6750), or, when the
+#    assertion is bound to the service provider's key, with the DPoP scheme and
+#    a proof of possession (RFC 9449). GET/POST /api/benefits validate it
+#    locally (DelegatedAssertion, DpopVerifier) and enforce the scopes the
+#    user approved; /decisions shows every decision; /attempts-api
 #    is the agency-role Attempts API viewer that joins Login.gov's events to
 #    those decisions on delegation_id.
 #
 # Supporting files: resource_server_config.rb (env vars), idp_metadata.rb
 # (IdP signing certificates), delegated_assertion.rb (validation steps),
-# assertion_replay_cache.rb, decision_log.rb, demo_benefits.rb,
+# dpop_verifier.rb (proof checks), assertion_replay_cache.rb, decision_log.rb,
+# demo_benefits.rb,
 # attempts_client.rb and attempts_configuration.rb.
 require 'dotenv/load'
 require 'erb'
@@ -28,6 +31,7 @@ require 'json'
 require_relative './resource_server_config'
 require_relative './idp_metadata'
 require_relative './delegated_assertion'
+require_relative './dpop_verifier'
 require_relative './assertion_replay_cache'
 require_relative './decision_log'
 require_relative './demo_benefits'
@@ -42,6 +46,9 @@ class RelyingParty < Sinatra::Base
   set :rs_config, ResourceServerConfig.new
   set :decision_log, DecisionLog.new(max_size: rs_config.decision_log_size)
   set :replay_cache, AssertionReplayCache.new
+  # DPoP proof `jti` values seen so far (RFC 9449 §11.1); same shape as the
+  # assertion replay cache, kept separate so the two policies stay independent.
+  set :dpop_jti_cache, AssertionReplayCache.new
   set :benefits, DemoBenefits.new
 
   # IdP metadata is fetched lazily on the first API call so the app boots
@@ -109,9 +116,9 @@ class RelyingParty < Sinatra::Base
     delegated-access-revoked
   ].freeze
 
-  # Raised by #bearer_token when the request carries no Bearer credentials.
+  # Raised by #presented_token when the request carries no Bearer or DPoP credentials.
   class MissingToken < StandardError; end
-  # Raised by #bearer_token when there is a Bearer header but it is malformed.
+  # Raised by #presented_token when there is a Bearer or DPoP header but it is malformed.
   class MalformedToken < StandardError; end
 
   # Raised by #enforce_scope; carries the validated assertion for the decision log.
@@ -397,20 +404,22 @@ class RelyingParty < Sinatra::Base
   # ---------------------------------------------------------------------------
 
   # Authorize the current request for `required_scope`, or halt with an
-  # RFC 6750 §3 error response. Steps, in order:
+  # RFC 6750 §3 / RFC 9449 §7.1 error response. Steps, in order:
   #
-  #   bearer_token                RFC 6750 §2.1  Authorization: Bearer <access_token>
+  #   presented_token             RFC 6750 §2.1, RFC 9449 §7.1  Authorization: Bearer|DPoP <token>
   #   DelegatedAssertion.decode   RFC 8693 §3    base64url SAML 2.0 assertion
   #   validate_assertion          SAML Core §2.4.1.2, §2.5.1, §5.4  signature, Issuer,
   #                               Recipient, Audience, both time windows, no
-  #                               InResponseTo; no call to Login.gov
+  #                               InResponseTo; no call to Login.gov; then, for
+  #                               a key-bound assertion, the DPoP proof
+  #                               (RFC 9449 §4.3)
   #   enforce_scope               delegation_scopes per endpoint
   #   log_decision                record what was decided
   #
   # @return [DelegatedAssertion] the validated assertion
   def authorize!(required_scope)
-    token = bearer_token
-    assertion = validate_assertion(DelegatedAssertion.decode(token))
+    token, scheme = presented_token
+    assertion = validate_assertion(DelegatedAssertion.decode(token), token:, scheme:)
     enforce_scope(assertion, required_scope)
     log_decision(assertion, required_scope:, decision: 'allow')
     assertion
@@ -421,6 +430,16 @@ class RelyingParty < Sinatra::Base
   rescue MalformedToken => e
     log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
     halt_bearer_error(400, 'invalid_request', e.message)
+  rescue DelegatedAssertion::InvalidProof => e
+    # RFC 9449 §7.1: the assertion is bound to a key but the proof of possession
+    # was missing or wrong. The challenge names the DPoP scheme and the
+    # algorithms this API accepts.
+    log_decision(nil, required_scope:, decision: 'deny', reason: e.message, key_bound: true)
+    halt_dpop_error(401, 'invalid_dpop_proof', e.message)
+  rescue DelegatedAssertion::SchemeMismatch => e
+    log_decision(nil, required_scope:, decision: 'deny', reason: e.message,
+                      key_bound: e.message.start_with?('key-bound'))
+    halt_dpop_error(401, 'invalid_token', e.message)
   rescue DelegatedAssertion::InvalidAssertion => e
     log_decision(nil, required_scope:, decision: 'deny', reason: e.message)
     halt_bearer_error(401, 'invalid_token', e.message)
@@ -434,19 +453,22 @@ class RelyingParty < Sinatra::Base
     halt_json(503, 'temporarily_unavailable', 'IdP metadata is not available; try again later')
   end
 
-  # RFC 6750 §2.1: the access token is sent in the Authorization header with
-  # the Bearer scheme (scheme name case-insensitive) in b64token syntax. The
-  # form-body (RFC 6750 §2.2) and query (§2.3) methods are not accepted.
+  # RFC 6750 §2.1 / RFC 9449 §7.1: the token is sent in the Authorization
+  # header with the Bearer scheme, or the DPoP scheme when it is key-bound
+  # (scheme names case-insensitive, RFC 9110 §11.1), in b64token syntax. The
+  # form-body (RFC 6750 §2.2) and query (§2.3) methods are not accepted. Which
+  # scheme is correct is decided once the assertion has been validated and its
+  # `dpop_jkt` attribute can be trusted (DelegatedAssertion#check_key_binding).
   #
-  # @return [String] the token exactly as the service provider received it
-  def bearer_token
+  # @return [Array(String, String)] the token exactly as presented, and the scheme
+  def presented_token
     header = request.env['HTTP_AUTHORIZATION'].to_s
-    raise MissingToken unless header.match?(/\ABearer(\s|\z)/i)
+    raise MissingToken unless header.match?(/\A(Bearer|DPoP)(\s|\z)/i)
 
-    match = header.match(%r{\ABearer\s+([A-Za-z0-9\-._~+/]+=*)\z}i)
-    raise MalformedToken.new('Bearer token is not b64token syntax (RFC 6750 §2.1)') if match.nil?
+    match = header.match(%r{\A(Bearer|DPoP)\s+([A-Za-z0-9\-._~+/]+=*)\z}i)
+    raise MalformedToken.new('token is not b64token syntax (RFC 6750 §2.1)') if match.nil?
 
-    match[1]
+    [match[2], match[1]]
   end
 
   # Validate the decoded XML locally against Login.gov's published metadata.
@@ -454,15 +476,20 @@ class RelyingParty < Sinatra::Base
   #
   # If the signature fails, Login.gov may have rotated its signing key (a new
   # year's metadata); refresh the cached metadata once (rate limited) and retry.
-  def validate_assertion(xml)
-    build_assertion(xml).validate!
+  def validate_assertion(xml, token:, scheme:)
+    build_assertion(xml, token:, scheme:).validate!
   rescue DelegatedAssertion::SignatureError
     raise unless self.class.idp_metadata.refresh_if_stale!
 
-    build_assertion(xml).validate!
+    build_assertion(xml, token:, scheme:).validate!
   end
 
-  def build_assertion(xml)
+  # How the token reached this request, for the key-binding check: the scheme,
+  # the token as presented (what `ath` hashes), the DPoP header, and the method
+  # and URL the proof must name. `request.base_url` reflects X-Forwarded-Proto
+  # and X-Forwarded-Host, so `htu` is compared against the URL the service
+  # provider called, not an internal one behind a gateway.
+  def build_assertion(xml, token:, scheme:)
     metadata = self.class.idp_metadata
     config = settings.rs_config
     DelegatedAssertion.new(
@@ -473,6 +500,23 @@ class RelyingParty < Sinatra::Base
       private_key: config.rs_private_key,
       clock_drift: config.allowed_clock_drift,
       replay_cache: config.replay_protection? ? settings.replay_cache : nil,
+      presentation: {
+        scheme:,
+        token:,
+        dpop_proof: request.env['HTTP_DPOP'],
+        method: request.request_method,
+        url: request.base_url + request.path,
+      },
+      dpop_verifier: dpop_verifier,
+    )
+  end
+
+  def dpop_verifier
+    config = settings.rs_config
+    DpopVerifier.new(
+      allowed_algs: config.dpop_allowed_algs,
+      iat_leeway: config.dpop_iat_leeway_seconds,
+      replay_cache: settings.dpop_jti_cache,
     )
   end
 
@@ -489,12 +533,13 @@ class RelyingParty < Sinatra::Base
   # Record the decision so the API can show every decision it made. When the
   # assertion did not validate, only the reason is recorded: nothing read from
   # an unverified assertion is trusted enough to log as fact.
-  def log_decision(assertion, required_scope:, decision:, reason: nil)
+  def log_decision(assertion, required_scope:, decision:, reason: nil, key_bound: nil)
     settings.decision_log.record(
       route: "#{request.request_method} #{request.path_info}",
       decision:,
       reason:,
       required_scope:,
+      key_bound: assertion ? assertion.bound? : key_bound,
       name_id: assertion&.name_id,
       uuid: assertion&.attributes&.fetch('uuid', nil),
       actor: assertion&.actor,
@@ -505,14 +550,29 @@ class RelyingParty < Sinatra::Base
   end
 
   # RFC 6750 §3: WWW-Authenticate: Bearer with realm, error, error_description
-  # and (for insufficient_scope) the scope the route needs.
+  # and (for insufficient_scope) the scope the route needs. A second, DPoP
+  # challenge advertises that key-bound tokens are accepted here and which
+  # algorithms the proof may use (RFC 9449 §7.1).
   def halt_bearer_error(status, error, description, scope: nil)
     challenge = ['Bearer realm="benefits-api"']
     challenge << "error=\"#{error}\"" if error
     challenge << "error_description=\"#{description.to_s.tr('"', "'")}\"" if description
     challenge << "scope=\"#{scope}\"" if scope
-    headers['WWW-Authenticate'] = challenge.join(', ')
+    headers['WWW-Authenticate'] = "#{challenge.join(', ')}, #{dpop_challenge}"
     halt_json(status, error || 'unauthorized', description)
+  end
+
+  # RFC 9449 §7.1: WWW-Authenticate: DPoP with the accepted algorithms and the
+  # error (`invalid_dpop_proof` for a bad or missing proof; `invalid_token`
+  # when the scheme does not fit the token).
+  def halt_dpop_error(status, error, description)
+    headers['WWW-Authenticate'] =
+      "#{dpop_challenge}, error=\"#{error}\", error_description=\"#{description.to_s.tr('"', "'")}\""
+    halt_json(status, error, description)
+  end
+
+  def dpop_challenge
+    "DPoP algs=\"#{settings.rs_config.dpop_allowed_algs.join(' ')}\""
   end
 
   def halt_json(status, error, description)
@@ -536,9 +596,10 @@ class RelyingParty < Sinatra::Base
 
   # Response body for both routes. `delegated_access` is what a
   # delegation-aware API reads: the acting service provider,
-  # the delegation_id that joins to Attempts API events, and the approved
-  # scopes. `_assertion` is a demo affordance so the service provider's demo
-  # page can show what the API saw; a production API would not echo it.
+  # the delegation_id that joins to Attempts API events, the approved
+  # scopes, and whether the assertion was key-bound (so the call carried a
+  # DPoP proof). `_assertion` is a demo affordance so the service provider's
+  # demo page can show what the API saw; a production API would not echo it.
   def benefits_payload(assertion, record)
     {
       benefits: record,
@@ -546,6 +607,7 @@ class RelyingParty < Sinatra::Base
         actor: assertion.actor,
         delegation_id: assertion.delegation_id,
         delegation_scopes: assertion.delegation_scopes,
+        key_bound: assertion.bound?,
       },
       _assertion: {
         id: assertion.assertion_id,

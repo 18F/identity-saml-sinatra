@@ -58,6 +58,17 @@ class ResourceServerConfig
     ENV.fetch('REPLAY_PROTECTION', 'true') == 'true'
   end
 
+  # JWS algorithms accepted in a DPoP proof (RFC 9449 §4.2); asymmetric only.
+  # Advertised in the WWW-Authenticate DPoP challenge (§7.1).
+  def dpop_allowed_algs
+    ENV.fetch('DPOP_ALLOWED_ALGS', 'ES256 RS256').split
+  end
+
+  # Seconds a DPoP proof's iat may differ from this server's clock (RFC 9449 §4.3 (10)).
+  def dpop_iat_leeway_seconds
+    ENV.fetch('DPOP_IAT_LEEWAY_SECONDS', '60').to_i
+  end
+
   # Number of authorization decisions kept in memory for GET /decisions.
   def decision_log_size
     ENV.fetch('DECISION_LOG_SIZE', '200').to_i

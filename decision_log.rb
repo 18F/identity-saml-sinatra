@@ -19,6 +19,7 @@ class DecisionLog
     :delegation_id,      # `delegation_id` attribute: joins to Attempts events
     :delegation_scopes,  # Array of approved token_exchange:* values
     :assertion_id,       # Assertion/@ID (what revocation and introspection key on)
+    :key_bound,          # true when the assertion carried dpop_jkt and a DPoP proof was required
     keyword_init: true,
   ) do
     def to_h
