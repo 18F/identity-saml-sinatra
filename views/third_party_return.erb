@@ -1,0 +1,27 @@
+<%# Third-Party-Initiated Login (OpenID Connect Core 1.0 §4,
+    https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin): the last step,
+    sending the user back to the third party that started this sign-in.
+
+    This is a page of our own rather than an HTTP redirect from the assertion consumer. Login.gov's
+    SAML POST-binding page is served with `Content-Security-Policy: form-action 'self' <our ACS>`,
+    and Chrome applies form-action to every redirect that follows a form submission, so a redirect
+    from /consume to the third party's origin is blocked and the user is left on Login.gov's page.
+    A navigation started from this document is governed by this app's policy instead. %>
+<meta http-equiv="refresh" content="0;url=<%= Rack::Utils.escape_html(return_url) %>">
+<div class="clearfix">
+  <div class="col-12 sm-col-6 mx-auto">
+    <div class="h5 p2 <%= status == 'signed_in' ? 'bg-green' : 'bg-red' %> white center">
+      <% if status == 'signed_in' %>
+        <span class="bold caps">Signed in.</span>
+        <span>Returning you to the service that sent you here.</span>
+      <% else %>
+        <span class="bold caps">Sign-in did not complete.</span>
+        <span>Returning you to the service that sent you here.</span>
+      <% end %>
+      <span class="block mt2">
+        <a class="btn btn-outline bg-white navy" id="third-party-return-link"
+           href="<%= Rack::Utils.escape_html(return_url) %>">Return to America.gov</a>
+      </span>
+    </div>
+  </div>
+</div>

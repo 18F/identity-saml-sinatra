@@ -1,3 +1,4 @@
+require 'cgi'
 # frozen_string_literal: true
 
 ENV['APP_ENV'] = 'test'
@@ -425,6 +426,13 @@ RSpec.describe RelyingParty do
       ENV.delete('THIRD_PARTY_TARGET_LINK_ALLOWLIST')
     end
 
+    # The return page carries the third party's URL in its refresh directive and its link.
+    def return_location(body)
+      match = body.match(/content="0;url=([^"]+)"/)
+      expect(match).not_to be_nil
+      URI(CGI.unescapeHTML(match[1]))
+    end
+
     def initiate(overrides = {})
       query = {
         iss: 'http://idp.example.com',
@@ -501,13 +509,18 @@ RSpec.describe RelyingParty do
       context 'when the SAML response is valid' do
         let(:valid_response) { true }
 
-        it 'sends the user back to target_link_uri with the same hint, this issuer and status' do
+        # Not a redirect: Login.gov's POST-binding page carries form-action 'self' <ACS>, which
+        # Chrome enforces on the redirects after the submission, so the return is a page that
+        # continues to the third party (see views/third_party_return.erb).
+        it 'answers with a page that sends the user to target_link_uri with the same hint, this issuer and status' do
           post 'consume?SAMLResponse=something'
 
-          expect(last_response).to be_redirect
-          location = URI(last_response.location)
+          expect(last_response.status).to eq(200)
+          location = return_location(last_response.body)
           expect("#{location.scheme}://#{location.host}:#{location.port}#{location.path}").
             to eq('http://localhost:9292/third_party/return')
+          expect(last_response.body).to include('http-equiv="refresh"')
+          expect(last_response.body).to include('id="third-party-return-link"')
           returned = URI.decode_www_form(location.query).to_h
           expect(returned).to include(
             'agency' => 'benefits',
@@ -542,8 +555,8 @@ RSpec.describe RelyingParty do
         it 'sends the user back with status=failed and clears the hand-off' do
           post 'consume?SAMLResponse=something'
 
-          expect(last_response).to be_redirect
-          returned = URI.decode_www_form(URI(last_response.location).query).to_h
+          expect(last_response.status).to eq(200)
+          returned = URI.decode_www_form(return_location(last_response.body).query).to_h
           expect(returned['status']).to eq('failed')
           expect(returned['login_hint']).to eq(login_hint)
           expect(last_request.session[:third_party_login]).to be_nil

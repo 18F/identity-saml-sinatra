@@ -383,7 +383,7 @@ class RelyingParty < Sinatra::Base
         handoff = session.delete(:third_party_login)
         if handoff
           session[:third_party_initiated_hint] = handoff['login_hint']
-          redirect to(third_party_return_url(handoff, status: 'signed_in'))
+          return third_party_return_page(handoff, status: 'signed_in')
         end
         redirect to('/success')
       end
@@ -396,7 +396,7 @@ class RelyingParty < Sinatra::Base
       # the third party with status=failed rather than landing on this app's
       # error page, and the hand-off is cleared so it cannot be completed later.
       handoff = session.delete(:third_party_login)
-      redirect to(third_party_return_url(handoff, status: 'failed')) if handoff
+      return third_party_return_page(handoff, status: 'failed') if handoff
 
       redirect to('/')
     end
@@ -876,6 +876,20 @@ class RelyingParty < Sinatra::Base
   #   login_hint  the third party's correlation value, echoed unchanged
   #   iss         this agency's SAML issuer, so the third party knows who returned the user
   #   status      signed_in or failed
+  # §4, last step, for a SAML relying party: hand the user back to the third party from a page of
+  # this app's own rather than with a redirect. The assertion arrived by a form POST from
+  # Login.gov's page, served with `form-action 'self' <our ACS>`; Chrome applies that policy to the
+  # redirects that follow the submission, so a 303 to the third party's origin is silently blocked
+  # (found in the live end-to-end run). A refresh from this document is a new navigation under this
+  # app's own policy. The hand-off was already removed from the session by the caller (single use).
+  def third_party_return_page(handoff, status:)
+    return_url = third_party_return_url(handoff, status:)
+    # The one place the hand-off leaves this app: the line to look for when a third party reports
+    # that the user never came back. The hint is a correlation value, not identity.
+    puts "Third-party-initiated login: returning the user to #{return_url}"
+    erb :third_party_return, locals: { return_url:, status: }
+  end
+
   def third_party_return_url(handoff, status:)
     uri = URI.parse(handoff['target_link_uri'])
     returned = {
