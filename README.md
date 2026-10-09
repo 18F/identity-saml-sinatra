@@ -10,8 +10,7 @@ provider, in two roles:
    `GET`/`POST /api/benefits`, that accepts **delegated SAML 2.0 assertions** issued by
    Login.gov's token exchange (RFC 8693) on behalf of a user to a third-party *service
    provider*, validates them locally with `ruby-saml`, and enforces the capabilities the user
-   approved. It also runs an Attempts API viewer in the **agency** role that joins Login.gov's
-   fraud-signal events to the API's own decisions on `delegation_id`.
+   approved.
 
 Everything here is a demo. Benefits data is fictional and generated from a hash of the
 user's identifier; nothing is persisted beyond the process.
@@ -47,12 +46,10 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 | Route | Role | Purpose |
 |---|---|---|
 | `GET /`, `/login_get`, `/login_post`, `POST /consume`, `/logout`, `/slo_logout` | direct sign-in | The original SAML service-provider sample |
-| `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party such as America.gov starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
+| `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party (the service provider) starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
 | `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof |
 | `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact`; same DPoP rule |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
-| `GET /attempts-api` | agency | Attempts API events for this agency; `?tab=delegated` groups them by `delegation_id` with the matching API decisions |
-| `POST /ack-events` | agency | Acknowledge (delete) events by JTI |
 
 ## Environment variables
 
@@ -60,12 +57,12 @@ Direct sign-in (unchanged from the original sample):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `issuer` | `urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency` | This agency's SAML issuer / entityID. Also the Attempts API issuer. |
+| `issuer` | `urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency` | This agency's SAML issuer / entityID. |
 | `assertion_consumer_service_url` | - | `http://localhost:4567/consume` locally |
 | `idp_sso_target_url`, `idp_slo_target_url` | - | Login.gov's year-suffixed SSO/SLO endpoints |
 | `idp_cert_fingerprint` | - | Fingerprint of the IdP signing certificate for the browser flow |
 | `sp_cert`, `sp_private_key` | `config/demo_sp.crt`, `config/demo_sp.key` | Required explicitly when the IdP host is `login.gov` |
-| `THIRD_PARTY_TARGET_LINK_ALLOWLIST` | `http://localhost:9292` | Space-separated origins a third-party-initiated login may return the user to (`target_link_uri`). Exact origin match, no wildcards; plain `http` only for `localhost`/`127.0.0.1`. The default is the America.gov reference app (`identity-sts-sinatra`). `idp_url` (below) is also the only `iss` accepted. |
+| `THIRD_PARTY_TARGET_LINK_ALLOWLIST` | `http://localhost:9292` | Space-separated origins a third-party-initiated login may return the user to (`target_link_uri`). Exact origin match, no wildcards; plain `http` only for `localhost`/`127.0.0.1`. The default is the MyBenefits Assistant reference app (`identity-sts-sinatra`). `idp_url` (below) is also the only `iss` accepted. |
 
 Resource server (new):
 
@@ -83,15 +80,6 @@ Resource server (new):
 | `DPOP_IAT_LEEWAY_SECONDS` | `60` | Seconds a DPoP proof's `iat` may differ from this server's clock |
 | `DECISION_LOG_SIZE` | `200` | Entries kept for `/decisions` |
 
-Attempts API viewer (agency role):
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `attempts_shared_secret` | `benefits-agency-attempts-secret` | Local-development placeholder matching the IdP's `allowed_attempts_providers` entry; replace for any real environment |
-| `attempts_private_key_path` | `./config/demo_sp.key` | Decrypts event JWEs (the agency's registered public key locally is the SP certificate) |
-| `signed_events` | `false` | Verify ES256-signed event payloads with the IdP's Attempts key |
-| `allow_all_events_plaintext` | `false` | Show every field instead of redacting to the allow-list |
-
 To run against the sandbox (`idp.int.identitysandbox.gov`) change `idp_url`, the
 direct-sign-in URLs, and the identifiers to the values from onboarding; no code changes.
 
@@ -103,8 +91,7 @@ this app as:
 - **Agency service provider** — issuer `urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency`,
   agency_id 2, IAL2, ACS `http://localhost:4567/consume`, certificate `sp_sinatra_demo`
   (this repo's `config/demo_sp.crt`), `block_encryption: aes256-cbc`, attribute bundle
-  `email first_name last_name`, `token_exchange_target: true`, enrolled in the Attempts API
-  with shared secret `benefits-agency-attempts-secret`.
+  `email first_name last_name`, `token_exchange_target: true`.
 - **Resource server** — `identifier: https://benefits-api.agency.localdev`,
   `token_format: saml2`, `certs: [sp_sinatra_demo]` (assertions are encrypted to it), with
   scopes `benefits_read` (read) and `benefits_write` (read_write).
@@ -116,25 +103,25 @@ encryption, and one scope with plain-language content per capability.
 ## Third-Party-Initiated Login (OpenID Connect Core 1.0 §4)
 
 [OpenID Connect Core 1.0 §4, Initiating Login from a Third Party](https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
-lets a party that is not the relying party ask the relying party to sign a user in. America.gov uses it
+lets a party that is not the relying party ask the relying party to sign a user in. The service provider uses it
 when an agency must interact with the user directly in its own service rather than through a delegated
 token. §4 is written for OpenID Connect relying parties; this app is a **SAML** service provider, and the
 pattern applies without change because the initiation request says nothing about the sign-in protocol:
 what it starts here is the same SAML AuthnRequest `/login_get` sends today.
 
-How it differs from delegated access: nothing is exchanged and no token is issued to America.gov. This
-agency signs the user in itself, receives its own assertion and attributes under its own agreement, and
-gets its own Attempts API events and billing, exactly as for a direct visit. America.gov only supplies the
-starting point and gets the user back at the end.
+How it differs from delegated access: nothing is exchanged and no token is issued to the service provider.
+This agency signs the user in itself, receives its own assertion and attributes under its own agreement,
+and is billed exactly as for a direct visit. The service provider only supplies the starting point and
+gets the user back at the end.
 
 ```
-America.gov ──► browser ──► GET /initiate_login?iss=<Login.gov>&login_hint=<UUID>&target_link_uri=<America.gov URL>
+the service provider ──► browser ──► GET /initiate_login?iss=<Login.gov>&login_hint=<UUID>&target_link_uri=<the service provider URL>
        │
        │   this app verifies iss (MUST, §4) ─── refused 400 unless it is the Login.gov this app trusts (idp_url)
        │   this app verifies target_link_uri (MUST, §4) ─── refused 400 unless its origin is allow-listed
        │   remembers {login_hint, target_link_uri} in the session, then
        ├──► browser ──► Login.gov SAML SSO (ordinary AuthnRequest; the hint is NOT forwarded)
-       │                Login.gov already has the user's session from America.gov, so no re-prompt
+       │                Login.gov already has the user's session from the service provider, so no re-prompt
        ├──► browser ──► POST /consume with the SAML response, validated as always
        └──► browser ──► <target_link_uri>?login_hint=<UUID>&iss=<this agency's SAML issuer>&status=signed_in
                         (or status=failed); the hand-off is single use and cleared
@@ -148,7 +135,7 @@ The two checks §4 requires of the relying party, and why:
 | `target_link_uri` MUST be verified | Otherwise the endpoint is an open redirector. Only an exact origin on `THIRD_PARTY_TARGET_LINK_ALLOWLIST` is accepted; the stored value is reused unchanged at return and this app appends its own parameters. |
 
 `login_hint` is opaque to this app: it is bounded in length, never used to identify the user (the SAML
-assertion does that), and only echoed back so America.gov can match the return to the request it made.
+assertion does that), and only echoed back so the service provider can match the return to the request it made.
 The signed-in pages show that the session was started by a third party and the hint it sent.
 
 ## How a delegated call works
@@ -290,30 +277,11 @@ API responses include `_assertion` (ID, issuer, NameID, windows, attributes) so 
 provider's demo page can show what the API saw. It is a demo affordance; a production API
 would not return it.
 
-## Attempts API viewer (agency role)
-
-`/attempts-api` polls `POST {idp_url}/api/attempts/poll` with
-`Authorization: Bearer <issuer> <attempts_shared_secret>`, decrypts each set (a JWE to the
-agency's registered key) and, if `signed_events=true`, verifies the ES256 payload with the key
-from `/.well-known/ssf-configuration`. Fields outside the allow-list in `app.rb`
-(`ALLOWED_PLAINTEXT_KEYS`) are redacted; the allow-list includes the delegated-access fields
-`actor_issuer`, `scopes`, `resources`, `remembered`, `ial`, `aal`, `delegation_id`, `reason`,
-`token_format` and `resource`.
-
-Delegated access adds four event types — `delegated-access-consented`,
-`delegated-access-token-issued`, `delegated-access-token-refreshed`,
-`delegated-access-revoked` — and tags the existing sign-in events with `delegation_id`. Any
-event with `delegation_id` or `actor_issuer` is a delegated session; its `subject.session_id`
-is the service provider's and will not match a session this agency started. The **Delegated
-sessions** tab (`?tab=delegated`) groups events by `delegation_id` and lists beneath each
-group the API decisions whose assertion carried the same `delegation_id`: the join agencies
-implement.
-
 ## Layout
 
 | File | Purpose |
 |---|---|
-| `app.rb` | Sinatra app: direct sign-in routes, `/initiate_login` (third-party-initiated login), `/api/benefits`, `authorize!` steps, decision log and Attempts routes |
+| `app.rb` | Sinatra app: direct sign-in routes, `/initiate_login` (third-party-initiated login), `/api/benefits`, `authorize!` steps, decision log |
 | `delegated_assertion.rb` | Assertion validation, one method per step |
 | `dpop_verifier.rb` | RFC 9449 DPoP proof checks for key-bound assertions, one method per check |
 | `idp_metadata.rb` | Fetch/cache IdP metadata; signing certificates and entityID |
@@ -321,7 +289,6 @@ implement.
 | `decision_log.rb` | Ring buffer behind `/decisions` |
 | `demo_benefits.rb` | Fictional records keyed by NameID |
 | `resource_server_config.rb` | Environment variables and defaults |
-| `attempts_client.rb`, `attempts_configuration.rb` | Attempts API polling, decryption, signature verification |
 | `spec/support/delegated_assertion_factory.rb` | Builds signed and encrypted test assertions with a runtime-generated IdP key pair |
 | `spec/support/dpop_factory.rb` | Builds DPoP proofs with runtime-generated service provider keys |
 

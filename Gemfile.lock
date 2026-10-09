@@ -67,8 +67,6 @@ GEM
     io-console (0.8.2)
     jmespath (1.6.2)
     json (2.20.0)
-    jwe (1.1.1)
-      base64
     jwt (2.10.3)
       base64
     language_server-protocol (3.17.0.6)
@@ -201,7 +199,6 @@ DEPENDENCIES
   dotenv
   faraday
   hashie
-  jwe
   jwt (~> 2.1)
   pry
   puma

@@ -8,12 +8,10 @@
 #    assertion is bound to the service provider's key, with the DPoP scheme and
 #    a proof of possession (RFC 9449). GET/POST /api/benefits validate it
 #    locally (DelegatedAssertion, DpopVerifier) and enforce the scopes the
-#    user approved; /decisions shows every decision; /attempts-api
-#    is the agency-role Attempts API viewer that joins Login.gov's events to
-#    those decisions on delegation_id.
+#    user approved; /decisions shows every decision.
 # 3. Third-Party-Initiated Login, the relying-party side of OpenID Connect Core
 #    1.0 §4 (https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
-#    applied to this SAML service provider: a third party such as America.gov
+#    applied to this SAML service provider: a third party (the service provider)
 #    sends the user's browser to GET /initiate_login naming Login.gov as the
 #    issuer; this app verifies the issuer and the return address, then runs
 #    its ordinary SAML sign-in and, when it completes, sends the user back to
@@ -22,8 +20,7 @@
 # Supporting files: resource_server_config.rb (env vars), idp_metadata.rb
 # (IdP signing certificates), delegated_assertion.rb (validation steps),
 # dpop_verifier.rb (proof checks), assertion_replay_cache.rb, decision_log.rb,
-# demo_benefits.rb,
-# attempts_client.rb and attempts_configuration.rb.
+# demo_benefits.rb.
 require 'dotenv/load'
 require 'erb'
 require 'hashie/mash'
@@ -42,8 +39,6 @@ require_relative './dpop_verifier'
 require_relative './assertion_replay_cache'
 require_relative './decision_log'
 require_relative './demo_benefits'
-require_relative './attempts_configuration'
-require_relative './attempts_client'
 
 class RelyingParty < Sinatra::Base
   use Rack::Session::Cookie, key: 'sinatra_sp', secret: SecureRandom.hex(32)
@@ -77,52 +72,6 @@ class RelyingParty < Sinatra::Base
   BENEFITS_READ = 'token_exchange:benefits_read'
   BENEFITS_WRITE = 'token_exchange:benefits_write'
 
-  # Attempts API event fields shown in plain text; everything else is redacted
-  # unless allow_all_events_plaintext is set. The identity-oidc-sinatra list
-  # plus the delegated-access fields and the subject identifiers an agency
-  # needs to recognize a delegated session.
-  ALLOWED_PLAINTEXT_KEYS = %w[
-    application_url
-    aws_region
-    client_port
-    client_user_agent
-    email_already_registered
-    failure_reason
-    language
-    mfa_device_type
-    occurred_at
-    otp_delivery_method
-    rate_limit_type
-    reauthentication
-    reproof
-    resend
-    success
-    unique_session_id
-    user_agent
-    subject_type
-    session_id
-    actor_issuer
-    scopes
-    resources
-    remembered
-    ial
-    aal
-    delegation_id
-    reason
-    token_format
-    resource
-  ].freeze
-
-  # Event types added for delegated access. Any event carrying a
-  # delegation_id belongs to a delegated session, including the existing
-  # sign-in event types re-mapped to the target agency.
-  DELEGATED_EVENT_TYPES = %w[
-    delegated-access-consented
-    delegated-access-token-issued
-    delegated-access-token-refreshed
-    delegated-access-revoked
-  ].freeze
-
   # Raised by #presented_token when the request carries no Bearer or DPoP credentials.
   class MissingToken < StandardError; end
 
@@ -146,7 +95,7 @@ class RelyingParty < Sinatra::Base
 
   # rubocop:disable Metrics/BlockLength
   helpers do
-    # HTML-escape values that came from assertions or Attempts events.
+    # HTML-escape values that came from assertions.
     def h(text)
       Rack::Utils.escape_html(text.to_s)
     end
@@ -320,7 +269,7 @@ class RelyingParty < Sinatra::Base
   # unchanged because the initiation request says nothing about the sign-in
   # protocol. What this endpoint starts is the same SAML AuthnRequest that
   # /login_get sends today. Because the user already holds a Login.gov session
-  # from America.gov, Login.gov completes the sign-in without re-prompting.
+  # from the service provider, Login.gov completes the sign-in without re-prompting.
   # ===========================================================================
 
   # GET /initiate_login?iss=...&login_hint=...&target_link_uri=...
@@ -438,31 +387,6 @@ class RelyingParty < Sinatra::Base
 
   get '/decisions.json' do
     json_response(decisions: settings.decision_log.entries.map(&:to_h))
-  end
-
-  # ===========================================================================
-  # Attempts API viewer in the agency role. Polls with the
-  # agency's credentials; the "Delegated sessions" tab groups events by
-  # delegation_id and lists the API decisions carrying the same delegation_id.
-  # ===========================================================================
-  get '/attempts-api' do
-    tab = params[:tab] == 'delegated' ? 'delegated' : 'events'
-    events = attempts_events
-    erb :attempts, locals: {
-      tab:,
-      attempts_events: events,
-      sessions: tab == 'delegated' ? delegated_sessions(events) : {},
-      error: nil,
-    }
-  rescue AttemptsClient::Error, AttemptsConfiguration::Error, Faraday::ConnectionFailed,
-         Errno::ECONNREFUSED => e
-    erb :attempts, locals: { tab: 'events', attempts_events: [], sessions: {}, error: e.message }
-  end
-
-  post '/ack-events' do
-    jtis = params[:jtis].to_s.split(',').map(&:strip).reject(&:empty?)
-    attempts_events(ack: jtis) unless jtis.empty?
-    redirect to("/attempts-api#{params[:tab] == 'delegated' ? '?tab=delegated' : ''}")
   end
 
   get '/failure_to_proof' do
@@ -700,7 +624,7 @@ class RelyingParty < Sinatra::Base
 
   # Response body for both routes. `delegated_access` is what a
   # delegation-aware API reads: the acting service provider,
-  # the delegation_id that joins to Attempts API events, the approved
+  # the delegation_id that identifies the grant, the approved
   # scopes, whether the assertion was key-bound (so the call carried a DPoP
   # proof) and the bound key's thumbprint. `_assertion` is a demo affordance so
   # the service provider's demo page can show what the API saw; a production
@@ -730,86 +654,6 @@ class RelyingParty < Sinatra::Base
         attributes: assertion.attributes,
       },
     }
-  end
-
-  # ---------------------------------------------------------------------------
-  # Attempts API helpers (agency role)
-  # ---------------------------------------------------------------------------
-
-  # Poll the Attempts API with this agency's credentials (see AttemptsClient
-  # for the wire protocol). Events are Security Event Tokens (RFC 8417).
-  # @return [Array<Hash>] decrypted Security Event Tokens
-  def attempts_events(ack: nil)
-    config = settings.rs_config
-    signing_key = nil
-    if config.signed_events?
-      signing_key = AttemptsConfiguration.cached_attempts_public_key(AttemptsConfiguration.cached)
-    end
-    AttemptsClient.new(config, signing_key:).poll(ack:)
-  end
-
-  # The single event inside a SET: { "<event type URI>" => { subject:, occurred_at:, ... } }.
-  def event_type(event)
-    (event['events'] || {}).keys.first.to_s.split('/').last
-  end
-
-  def event_payload(event)
-    (event['events'] || {}).values.first || {}
-  end
-
-  def delegated_event?(event)
-    payload = event_payload(event)
-    DELEGATED_EVENT_TYPES.include?(event_type(event)) ||
-      !payload['delegation_id'].nil? || !payload['actor_issuer'].nil?
-  end
-
-  # The join a target agency implements: events grouped by delegation_id, each
-  # group paired with the API decisions that carried the same delegation_id
-  # in the assertion's `delegation_id` attribute.
-  #
-  # @return [Hash{String => Hash}] delegation_id => { events:, decisions:, actor_issuer:, ... }
-  def delegated_sessions(events)
-    grouped = events.select { |e| delegated_event?(e) && event_payload(e)['delegation_id'] }.
-      group_by { |e| event_payload(e)['delegation_id'] }
-
-    grouped.to_h do |delegation_id, group|
-      sorted = group.sort_by { |e| event_payload(e)['occurred_at'].to_f }
-      consent = sorted.find { |e| event_type(e) == 'delegated-access-consented' }
-      first_with = ->(key) { sorted.map { |e| event_payload(e)[key] }.compact.first }
-      [
-        delegation_id,
-        {
-          events: sorted,
-          decisions: settings.decision_log.for_delegation(delegation_id),
-          actor_issuer: first_with.call('actor_issuer'),
-          resources: event_payload(consent || {})['resources'] || first_with.call('resource'),
-          scopes: first_with.call('scopes'),
-          remembered: event_payload(consent || {})['remembered'],
-          revoked: sorted.any? { |e| event_type(e) == 'delegated-access-revoked' },
-        },
-      ]
-    end
-  end
-
-  # Redact event fields not in ALLOWED_PLAINTEXT_KEYS (recursively). Events
-  # can carry personal data; the demo shows only fields needed to follow a
-  # session unless allow_all_events_plaintext is set.
-  def event_data(payload)
-    return payload if settings.rs_config.allow_all_events_plaintext?
-
-    redact_data(payload)
-  end
-
-  def redact_data(data)
-    data.to_h do |key, value|
-      if value.is_a?(Hash)
-        [key, redact_data(value)]
-      elsif ALLOWED_PLAINTEXT_KEYS.include?(key.to_s)
-        [key, value]
-      else
-        [key, 'REDACTED']
-      end
-    end
   end
 
   # ---------------------------------------------------------------------------

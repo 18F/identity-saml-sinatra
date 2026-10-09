@@ -15,10 +15,9 @@ class ResourceServerConfig
   DEFAULT_IDP_URL = 'http://localhost:3000'
   DEFAULT_SAML_METADATA_YEAR = '2026'
   DEFAULT_PRIVATE_KEY_PATH = './config/demo_sp.key'
-  DEFAULT_ATTEMPTS_SHARED_SECRET = 'benefits-agency-attempts-secret'
 
   # The agency's SAML issuer (entityID). The IdP registers this SP as the owner
-  # of the resource server below and delivers Attempts API events to it.
+  # of the resource server below.
   def issuer
     ENV.fetch('issuer', DEFAULT_ISSUER)
   end
@@ -81,7 +80,7 @@ class ResourceServerConfig
   # an open redirector; this app accepts only an exact origin match against
   # this list. Space-separated `scheme://host[:port]` values, no wildcards.
   # Plain http is honored only for local development hosts; anything else must
-  # be https. The default is the America.gov reference app (identity-sts-sinatra).
+  # be https. The default is the MyBenefits Assistant reference app (identity-sts-sinatra).
   #
   # @return [Array<String>] normalized origins
   def third_party_target_link_allowlist
@@ -114,36 +113,5 @@ class ResourceServerConfig
       ENV['sp_private_key'] ||
         File.read(ENV.fetch('RS_PRIVATE_KEY_PATH', DEFAULT_PRIVATE_KEY_PATH)),
     )
-  end
-
-  # --- Attempts API (agency role) ---------------------------------------------
-
-  def attempts_url
-    "#{idp_url}/api/attempts/poll"
-  end
-
-  def attempts_shared_secret
-    ENV.fetch('attempts_shared_secret', DEFAULT_ATTEMPTS_SHARED_SECRET)
-  end
-
-  # Attempts events are JWEs encrypted to the agency's registered public key.
-  # Locally that is the same key pair as the SP certificate.
-  #
-  # @return [OpenSSL::PKey::RSA]
-  def attempts_private_key
-    @attempts_private_key ||= OpenSSL::PKey::RSA.new(
-      File.read(ENV.fetch('attempts_private_key_path', DEFAULT_PRIVATE_KEY_PATH)),
-    )
-  end
-
-  # When the IdP signs event payloads (attempts_api_signing_enabled), the JWE
-  # plaintext is an ES256 JWT that must be verified with the IdP's Attempts key.
-  def signed_events?
-    ENV['signed_events'] == 'true'
-  end
-
-  # Show every event field instead of redacting to ALLOWED_PLAINTEXT_KEYS.
-  def allow_all_events_plaintext?
-    ENV['allow_all_events_plaintext'] == 'true'
   end
 end

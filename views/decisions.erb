@@ -7,9 +7,8 @@
     <p class="usa-intro">
       Every call to <code>/api/benefits</code> and what this resource server decided, newest first.
       Held in memory (last <%= settings.rs_config.decision_log_size %>); also available as
-      <a href="/decisions.json">JSON</a>. The <code>delegation_id</code> column joins these
-      decisions to the Attempts API events on the
-      <a href="/attempts-api?tab=delegated">Delegated sessions</a> tab.
+      <a href="/decisions.json">JSON</a>. The <code>delegation_id</code> column identifies the
+      delegation each call was made under.
     </p>
     <p>
       Validation is local: signature against the IdP metadata at
