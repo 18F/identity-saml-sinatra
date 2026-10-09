@@ -357,6 +357,25 @@ class RelyingParty < Sinatra::Base
   # SAML assertion Login.gov's token exchange issued for this resource server.
   # ===========================================================================
 
+  # CORS (Fetch standard, https://fetch.spec.whatwg.org/#http-cors-protocol).
+  # The reference service provider is a browser-based public client: its pages
+  # call this API with fetch from another origin. Before a request that carries
+  # an Authorization or DPoP header the browser sends a preflight OPTIONS naming
+  # the method and headers it intends to use; the real request follows only if
+  # the preflight answer allows them. Both answers must carry the CORS headers,
+  # including error answers (401/403), or the page cannot read the status or the
+  # WWW-Authenticate challenge and sees only a network error.
+  before %r{/api/.*} do
+    cors_headers!
+  end
+
+  # Preflight: no credentials are checked here. The browser only asks whether
+  # the origin, method and headers are acceptable; the token arrives with the
+  # request that follows.
+  options %r{/api/.*} do
+    halt 204
+  end
+
   # Reads require the read capability the user approved for this API.
   get '/api/benefits' do
     assertion = authorize!(BENEFITS_READ)
@@ -601,6 +620,27 @@ class RelyingParty < Sinatra::Base
 
   def dpop_challenge
     "DPoP algs=\"#{settings.rs_config.dpop_allowed_algs.join(' ')}\""
+  end
+
+  # Add the CORS response headers when the request comes from an allowed origin.
+  # `Access-Control-Allow-Origin` echoes the one matching origin (never `*`:
+  # the responses carry per-user data), `Vary: Origin` keeps caches from
+  # serving one origin's answer to another, and the allow lists name exactly
+  # what the service provider sends: GET and POST with `Authorization`
+  # (Bearer or DPoP scheme), the `DPoP` proof header and a JSON body.
+  # `WWW-Authenticate` is exposed so the page can read the challenge
+  # (RFC 6750 §3, RFC 9449 §7.1) on a 401 or 403. A request from any other
+  # origin gets no CORS headers and the browser withholds the response.
+  def cors_headers!
+    origin = request.env['HTTP_ORIGIN'].to_s.chomp('/').downcase
+    return if origin.empty? || !settings.rs_config.cors_allowed_origins.include?(origin)
+
+    headers 'Access-Control-Allow-Origin' => request.env['HTTP_ORIGIN'],
+            'Vary' => 'Origin',
+            'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Authorization, DPoP, Content-Type',
+            'Access-Control-Expose-Headers' => 'WWW-Authenticate',
+            'Access-Control-Max-Age' => '600'
   end
 
   def halt_json(status, error, description)

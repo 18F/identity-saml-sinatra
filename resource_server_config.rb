@@ -98,6 +98,20 @@ class ResourceServerConfig
     end
   end
 
+  # Browser origins allowed to call the delegated-access API (GET/POST
+  # /api/benefits) from a web page on another origin (CORS, Fetch standard
+  # https://fetch.spec.whatwg.org/#http-cors-protocol). The reference service
+  # provider is a browser-based public client, so its pages call this API with
+  # fetch and the browser enforces this list. Exact `scheme://host[:port]`
+  # values, space- or comma-separated, no wildcards; the default is the local
+  # MyBenefits Assistant reference app.
+  #
+  # @return [Array<String>] normalized origins
+  def cors_allowed_origins
+    ENV.fetch('CORS_ALLOWED_ORIGINS', 'http://localhost:9292').split(/[\s,]+/).
+      reject(&:empty?).map { |origin| origin.chomp('/').downcase }
+  end
+
   # Number of authorization decisions kept in memory for GET /decisions.
   def decision_log_size
     ENV.fetch('DECISION_LOG_SIZE', '200').to_i

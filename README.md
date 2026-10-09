@@ -10,7 +10,7 @@ provider, in two roles:
    `GET`/`POST /api/benefits`, that accepts **delegated SAML 2.0 assertions** issued by
    Login.gov's token exchange (RFC 8693) on behalf of a user to a third-party *service
    provider*, validates them locally with `ruby-saml`, and enforces the capabilities the user
-   approved.
+   approved. The API answers cross-origin requests from the service provider's browser pages (CORS).
 
 Everything here is a demo. Benefits data is fictional and generated from a hash of the
 user's identifier; nothing is persisted beyond the process.
@@ -50,6 +50,7 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 | `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof |
 | `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact`; same DPoP rule |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
+| `OPTIONS /api/*` | resource server | CORS preflight answer for the service provider's browser pages (see below) |
 
 ## Environment variables
 
@@ -79,6 +80,7 @@ Resource server (new):
 | `DPOP_ALLOWED_ALGS` | `ES256 RS256` | JWS algorithms accepted in a DPoP proof; advertised in the `WWW-Authenticate` challenge |
 | `DPOP_IAT_LEEWAY_SECONDS` | `60` | Seconds a DPoP proof's `iat` may differ from this server's clock |
 | `DECISION_LOG_SIZE` | `200` | Entries kept for `/decisions` |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:9292` | Browser origins allowed to call `/api/*` cross-origin (exact `scheme://host[:port]`, space- or comma-separated). The service provider reference app is a browser public client and calls this API with `fetch` |
 
 To run against the sandbox (`idp.int.identitysandbox.gov`) change `idp_url`, the
 direct-sign-in URLs, and the identifiers to the values from onboarding; no code changes.
@@ -277,11 +279,34 @@ API responses include `_assertion` (ID, issuer, NameID, windows, attributes) so 
 provider's demo page can show what the API saw. It is a demo affordance; a production API
 would not return it.
 
+## CORS for the service provider's browser
+
+The reference service provider is a browser-based public client: the page the user is looking at
+holds the delegated assertion and calls `GET`/`POST /api/benefits` with `fetch`. Because that page
+is served from another origin, the browser first sends a preflight `OPTIONS /api/benefits` naming
+the method and the request headers, and only sends the real request if the answer allows them
+(Fetch standard, https://fetch.spec.whatwg.org/#http-cors-protocol). For requests whose `Origin`
+is in `CORS_ALLOWED_ORIGINS` the API answers with:
+
+```
+Access-Control-Allow-Origin: <the matching origin>
+Vary: Origin
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Headers: Authorization, DPoP, Content-Type
+Access-Control-Expose-Headers: WWW-Authenticate
+Access-Control-Max-Age: 600
+```
+
+The headers are added to every `/api/*` response, including 401 and 403, so the page can read
+the `WWW-Authenticate` challenge (RFC 6750 §3, RFC 9449 §7.1). The preflight checks no
+credentials; the assertion and the DPoP proof arrive with the request that follows. A request
+from an origin not in the list gets no CORS headers and the browser withholds the response.
+
 ## Layout
 
 | File | Purpose |
 |---|---|
-| `app.rb` | Sinatra app: direct sign-in routes, `/initiate_login` (third-party-initiated login), `/api/benefits`, `authorize!` steps, decision log |
+| `app.rb` | Sinatra app: direct sign-in routes, `/initiate_login` (third-party-initiated login), `/api/benefits` with CORS, `authorize!` steps, decision log |
 | `delegated_assertion.rb` | Assertion validation, one method per step |
 | `dpop_verifier.rb` | RFC 9449 DPoP proof checks for key-bound assertions, one method per check |
 | `idp_metadata.rb` | Fetch/cache IdP metadata; signing certificates and entityID |
