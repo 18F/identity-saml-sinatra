@@ -11,9 +11,10 @@ require_relative './dpop_verifier'
 # Validates a delegated SAML 2.0 assertion that a service provider presents to
 # this API as a bearer token, and exposes what the API needs from it.
 #
-# The token is what Login.gov's token exchange returned for
-# `requested_token_type=urn:ietf:params:oauth:token-type:saml2`: per RFC 8693 §3
-# a base64url-encoded SAML 2.0 *assertion* -- not a <samlp:Response> -- and,
+# The token is what Login.gov's token exchange returned for an API registered
+# for SAML assertions (the response's `issued_token_type` is
+# `urn:ietf:params:oauth:token-type:saml2`): per RFC 8693 §3 a base64url-encoded
+# SAML 2.0 *assertion* -- not a <samlp:Response> -- and,
 # because this resource server registered a certificate, wrapped in a
 # <saml:EncryptedAssertion>.
 #

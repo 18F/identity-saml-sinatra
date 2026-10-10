@@ -150,8 +150,9 @@ The signed-in pages show that the session was started by a third party and the h
 ## How a delegated call works
 
 ```
-Service provider ── POST /api/openid_connect/token (token-exchange, requested_token_type=saml2) ──► Login.gov
-                 ◄── { access_token: <base64url EncryptedAssertion>, token_type: N_A, ... } ──────
+Service provider ── POST /api/openid_connect/token (token-exchange, resource=<this API>) ─────────► Login.gov
+                 ◄── { access_token: <base64url EncryptedAssertion>, issued_token_type: …:saml2,
+                       token_type: N_A, session_live: false only when the user's sign-in has ended, ... }
 Service provider ── GET /api/benefits  Authorization: Bearer <access_token> ──────────────────────► this app
                  ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound, dpop_jkt }, _assertion }
 ```
