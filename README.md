@@ -8,10 +8,10 @@ provider, in two roles:
    SAML response is posted to `/consume`. This is the original sample and is unchanged.
 2. **SAML resource server for delegated access** (reference implementation). An API,
    `GET /api/benefits`, that accepts **delegated SAML 2.0 assertions** issued by Login.gov's
-   token exchange (RFC 8693) on behalf of a user to a third-party *service provider*, validates
+   token exchange (RFC 8693) on behalf of a user to a third-party *client broker*, validates
    them locally with `ruby-saml`, and requires this application's one delegation scope
    (`token_exchange:retirement_benefits`). The application is registered read-only, so the API
-   has no write route. It answers cross-origin requests from the service provider's browser
+   has no write route. It answers cross-origin requests from the broker's browser
    pages (CORS).
 
 Everything here is a demo. Benefits data is fictional and generated from a hash of the
@@ -48,10 +48,10 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 | Route | Role | Purpose |
 |---|---|---|
 | `GET /`, `/login_get`, `/login_post`, `POST /consume`, `/logout`, `/slo_logout` | direct sign-in | The original SAML service-provider sample |
-| `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party (the service provider) starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
+| `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party (the broker) starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
 | `GET /api/benefits` | resource server | Requires `token_exchange:retirement_benefits` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof. There is no `POST`: the application is registered read-only |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
-| `OPTIONS /api/*` | resource server | CORS preflight answer for the service provider's browser pages (see below) |
+| `OPTIONS /api/*` | resource server | CORS preflight answer for the broker's browser pages (see below) |
 
 ## Environment variables
 
@@ -82,7 +82,7 @@ Resource server (new):
 | `DPOP_IAT_LEEWAY_SECONDS` | `60` | Seconds a DPoP proof's `iat` may differ from this server's clock |
 | `DECISION_LOG_SIZE` | `200` | Entries kept for `/decisions` |
 | `DELEGATION_SCOPE` | `token_exchange:retirement_benefits` | The application's one delegation scope, as registered at Login.gov; the route requires it |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:9292` | Browser origins allowed to call `/api/*` cross-origin (exact `scheme://host[:port]`, space- or comma-separated). The service provider reference app is a browser public client and calls this API with `fetch` |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:9292` | Browser origins allowed to call `/api/*` cross-origin (exact `scheme://host[:port]`, space- or comma-separated). The broker reference app is a browser public client and calls this API with `fetch` |
 
 To run against the sandbox (`idp.int.identitysandbox.gov`) change `idp_url`, the
 direct-sign-in URLs, and the identifiers to the values from onboarding; no code changes.
@@ -104,7 +104,7 @@ The local IdP fixtures (`config/delegated_access.localdev.yml` in `identity-idp`
   `token_format: saml2`, `certs: [sp_sinatra_demo]` (assertions are encrypted to it).
 
 Nothing in that file turns key binding on or off: assertions are key-bound whenever the
-service provider is a public client. An agency onboarding for real supplies the same things:
+broker is a public client. An agency onboarding for real supplies the same things:
 its SAML issuer, one delegation scope with plain-language content, its access type (`read` or
 `read_write`), the service providers it accepts, the resource server identifier,
 `token_format: saml2`, and a certificate for encryption.
@@ -112,25 +112,25 @@ its SAML issuer, one delegation scope with plain-language content, its access ty
 ## Third-Party-Initiated Login (OpenID Connect Core 1.0 §4)
 
 [OpenID Connect Core 1.0 §4, Initiating Login from a Third Party](https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
-lets a party that is not the relying party ask the relying party to sign a user in. The service provider uses it
+lets a party that is not the relying party ask the relying party to sign a user in. The broker uses it
 when an agency must interact with the user directly in its own service rather than through a delegated
 token. §4 is written for OpenID Connect relying parties; this app is a **SAML** service provider, and the
 pattern applies without change because the initiation request says nothing about the sign-in protocol:
 what it starts here is the same SAML AuthnRequest `/login_get` sends today.
 
-How it differs from delegated access: nothing is exchanged and no token is issued to the service provider.
+How it differs from delegated access: nothing is exchanged and no token is issued to the broker.
 This agency signs the user in itself, receives its own assertion and attributes under its own agreement,
-and is billed exactly as for a direct visit. The service provider only supplies the starting point and
+and is billed exactly as for a direct visit. The broker only supplies the starting point and
 gets the user back at the end.
 
 ```
-the service provider ──► browser ──► GET /initiate_login?iss=<Login.gov>&login_hint=<UUID>&target_link_uri=<the service provider URL>
+the broker ──► browser ──► GET /initiate_login?iss=<Login.gov>&login_hint=<UUID>&target_link_uri=<the broker URL>
        │
        │   this app verifies iss (MUST, §4) ─── refused 400 unless it is the Login.gov this app trusts (idp_url)
        │   this app verifies target_link_uri (MUST, §4) ─── refused 400 unless its origin is allow-listed
        │   remembers {login_hint, target_link_uri} in the session, then
        ├──► browser ──► Login.gov SAML SSO (ordinary AuthnRequest; the hint is NOT forwarded)
-       │                Login.gov already has the user's session from the service provider, so no re-prompt
+       │                Login.gov already has the user's session from the broker, so no re-prompt
        ├──► browser ──► POST /consume with the SAML response, validated as always
        └──► browser ──► <target_link_uri>?login_hint=<UUID>&iss=<this agency's SAML issuer>&status=signed_in
                         (or status=failed); the hand-off is single use and cleared
@@ -144,26 +144,26 @@ The two checks §4 requires of the relying party, and why:
 | `target_link_uri` MUST be verified | Otherwise the endpoint is an open redirector. Only an exact origin on `THIRD_PARTY_TARGET_LINK_ALLOWLIST` is accepted; the stored value is reused unchanged at return and this app appends its own parameters. |
 
 `login_hint` is opaque to this app: it is bounded in length, never used to identify the user (the SAML
-assertion does that), and only echoed back so the service provider can match the return to the request it made.
+assertion does that), and only echoed back so the broker can match the return to the request it made.
 The signed-in pages show that the session was started by a third party and the hint it sent.
 
 ## How a delegated call works
 
 ```
-Service provider ── POST /api/openid_connect/token (token-exchange, resource=<this API>) ─────────► Login.gov
+Broker ── POST /api/openid_connect/token (token-exchange, resource=<this API>) ─────────► Login.gov
                  ◄── { access_token: <base64url EncryptedAssertion>, issued_token_type: …:saml2,
                        token_type: N_A, session_live: false only when the user's sign-in has ended, ... }
-Service provider ── GET /api/benefits  Authorization: Bearer <access_token> ──────────────────────► this app
+Broker ── GET /api/benefits  Authorization: Bearer <access_token> ──────────────────────► this app
                  ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound, dpop_jkt }, _assertion }
 ```
 
-Whether the assertion is key-bound follows the service provider's client type: a public
-client's (the browser-based reference service provider's) always are, a confidential client's
+Whether the assertion is key-bound follows the broker's client type: a public
+client's (the browser-based reference broker's) always are, a confidential client's
 never; no application sets or waives it. For a bound assertion Login.gov adds a `dpop_jkt`
 attribute and the call looks like this instead:
 
 ```
-Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
+Broker ── GET /api/benefits  Authorization: DPoP <access_token>
                                        DPoP: <proof JWT signed with the bound key> ──────────────► this app
 ```
 
@@ -204,7 +204,7 @@ Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
 7. `read_attributes` — the `AttributeStatement`, keyed by `Name`. `delegation_scopes` (the one
    `token_exchange:*` value of the application the assertion is for) and `delegation_id` are
    required; without them
-   it is not a delegated assertion. `actor` is the service provider's issuer, the SAML
+   it is not a delegated assertion. `actor` is the broker's issuer, the SAML
    counterpart of the OAuth `act` claim (RFC 8693 §4.1); it is observed and logged when present
    but its absence alone is never a reason to reject, so an API that also accepts assertions
    without it keeps working. `dpop_jkt`, when present, is the RFC 7638 thumbprint of the key
@@ -221,16 +221,16 @@ Error responses follow RFC 6750 §3: `401` with `WWW-Authenticate: Bearer realm=
 (no `error` when no credentials were sent; `error="invalid_token"` otherwise), `400
 invalid_request` for a malformed header, `403 insufficient_scope` with the `scope` the route
 needs, `503` if metadata cannot be fetched (fail closed). Every challenge also carries
-`DPoP algs="ES256 RS256"` (RFC 9449 §7.1) so a service provider learns that key-bound tokens
+`DPoP algs="ES256 RS256"` (RFC 9449 §7.1) so a broker learns that key-bound tokens
 are accepted and which proof algorithms work.
 
 ### Key-bound assertions (RFC 9449 DPoP)
 
 An unbound delegated assertion is a bearer token: whoever holds it can use it for its
-five-minute window. A public client, such as the browser-based reference service provider,
+five-minute window. A public client, such as the browser-based reference broker,
 proves possession of a key pair on every exchange with Login.gov, and Login.gov binds the
 family to that key and puts the key's RFC 7638 thumbprint in a `dpop_jkt` attribute. That
-binding is decided by the service provider's client type alone; this API has no setting for
+binding is decided by the broker's client type alone; this API has no setting for
 it and enforces the binding whenever `dpop_jkt` is present (`dpop_verifier.rb`, one method per
 check):
 
@@ -256,7 +256,7 @@ Agency checklist for key-bound assertions: read `dpop_jkt` only after the signat
 require the `DPoP` scheme when it is present and refuse `Bearer`; verify a fresh proof on
 every request (the cached result of one request never covers the next); keep a `jti` cache
 shared across instances in a multi-instance deployment; and make sure the URL your code
-compares `htu` against is the one the service provider called.
+compares `htu` against is the one the broker called.
 
 ### Delegation-aware policy
 
@@ -285,10 +285,10 @@ required and this app does not use it.
 
 With `REPLAY_PROTECTION=true` (default) each assertion ID is accepted once and remembered
 until its `NotOnOrAfter` + drift (`assertion_replay_cache.rb`, in memory, per process). This
-is agency policy, not a Login.gov requirement: a service provider is expected to hold an
+is agency policy, not a Login.gov requirement: a broker is expected to hold an
 assertion for up to five minutes and may call the API more than once with it. Agencies that
 expect repeat calls set `REPLAY_PROTECTION=false`; agencies that keep it on should tell
-service providers to refresh before each call.
+brokers to refresh before each call.
 
 ### The `_assertion` echo
 
@@ -296,9 +296,9 @@ API responses include `_assertion` (ID, issuer, NameID, windows, attributes) so 
 provider's demo page can show what the API saw. It is a demo affordance; a production API
 would not return it.
 
-## CORS for the service provider's browser
+## CORS for the broker's browser
 
-The reference service provider is a browser-based public client: the page the user is looking at
+The reference broker is a browser-based public client: the page the user is looking at
 holds the delegated assertion and calls `GET /api/benefits` with `fetch`. Because that page
 is served from another origin, the browser first sends a preflight `OPTIONS /api/benefits` naming
 the method and the request headers, and only sends the real request if the answer allows them
@@ -332,7 +332,7 @@ from an origin not in the list gets no CORS headers and the browser withholds th
 | `demo_benefits.rb` | Fictional records keyed by NameID |
 | `resource_server_config.rb` | Environment variables and defaults |
 | `spec/support/delegated_assertion_factory.rb` | Builds signed and encrypted test assertions with a runtime-generated IdP key pair |
-| `spec/support/dpop_factory.rb` | Builds DPoP proofs with runtime-generated service provider keys |
+| `spec/support/dpop_factory.rb` | Builds DPoP proofs with runtime-generated broker keys |
 
 ## Contributing
 

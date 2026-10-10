@@ -24,7 +24,7 @@ class ResourceServerConfig
   end
 
   # The resource server identifier registered with Login.gov. It is the
-  # `resource` value the service provider sends to the token exchange and the
+  # `resource` value the broker sends to the token exchange and the
   # value this app requires in the assertion's Audience and Recipient.
   def resource_identifier
     ENV.fetch('RESOURCE_IDENTIFIER', DEFAULT_RESOURCE_IDENTIFIER)

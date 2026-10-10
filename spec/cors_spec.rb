@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # CORS on the delegated-access API (Fetch standard, https://fetch.spec.whatwg.org/#http-cors-protocol).
-# The reference service provider is a browser public client, so the browser enforces these headers.
+# The reference broker is a browser public client, so the browser enforces these headers.
 
 ENV['APP_ENV'] = 'test'
 

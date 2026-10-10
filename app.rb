@@ -2,17 +2,17 @@
 #
 # 1. Direct SAML sign-in (the original sample): /login_get, /login_post,
 #    /consume, /logout, /slo_logout. Unchanged.
-# 2. SAML resource server for delegated access: a third-party service provider
+# 2. SAML resource server for delegated access: a third-party client broker
 #    obtains a SAML 2.0 assertion for this API from Login.gov's token exchange
 #    (RFC 8693) and presents it as a bearer token (RFC 6750), or, when the
-#    assertion is bound to the service provider's key, with the DPoP scheme and
+#    assertion is bound to the broker's key, with the DPoP scheme and
 #    a proof of possession (RFC 9449). GET /api/benefits validates it locally
 #    (DelegatedAssertion, DpopVerifier) and requires this application's one
 #    delegation scope; the application is registered read-only, so there is
 #    no write route. /decisions shows every decision.
 # 3. Third-Party-Initiated Login, the relying-party side of OpenID Connect Core
 #    1.0 §4 (https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
-#    applied to this SAML service provider: a third party (the service provider)
+#    applied to this SAML service provider: a third party (the broker)
 #    sends the user's browser to GET /initiate_login naming Login.gov as the
 #    issuer; this app verifies the issuer and the return address, then runs
 #    its ordinary SAML sign-in and, when it completes, sends the user back to
@@ -264,7 +264,7 @@ class RelyingParty < Sinatra::Base
   # unchanged because the initiation request says nothing about the sign-in
   # protocol. What this endpoint starts is the same SAML AuthnRequest that
   # /login_get sends today. Because the user already holds a Login.gov session
-  # from the service provider, Login.gov completes the sign-in without re-prompting.
+  # from the broker, Login.gov completes the sign-in without re-prompting.
   # ===========================================================================
 
   # GET /initiate_login?iss=...&login_hint=...&target_link_uri=...
@@ -348,12 +348,12 @@ class RelyingParty < Sinatra::Base
 
 
   # ===========================================================================
-  # Delegated-access API. The service provider calls these with the
+  # Delegated-access API. The broker calls these with the
   # SAML assertion Login.gov's token exchange issued for this resource server.
   # ===========================================================================
 
   # CORS (Fetch standard, https://fetch.spec.whatwg.org/#http-cors-protocol).
-  # The reference service provider is a browser-based public client: its pages
+  # The reference broker is a browser-based public client: its pages
   # call this API with fetch from another origin. Before a request that carries
   # an Authorization or DPoP header the browser sends a preflight OPTIONS naming
   # the method and headers it intends to use; the real request follows only if
@@ -519,7 +519,7 @@ class RelyingParty < Sinatra::Base
         # Rack exposes the DPoP header as HTTP_DPOP; nil when absent.
         dpop_proof: request.env['HTTP_DPOP'],
         method: request.request_method,
-        # `htu` must equal the URL the service provider called, without query
+        # `htu` must equal the URL the broker called, without query
         # or fragment (RFC 9449 §4.3 (9)). Behind a TLS-terminating proxy or
         # gateway the app sees http://internal-host, but Rack's base_url
         # follows X-Forwarded-Proto and X-Forwarded-Host, so this rebuilds the
@@ -609,7 +609,7 @@ class RelyingParty < Sinatra::Base
   # `Access-Control-Allow-Origin` echoes the one matching origin (never `*`:
   # the responses carry per-user data), `Vary: Origin` keeps caches from
   # serving one origin's answer to another, and the allow lists name exactly
-  # what the service provider sends: GET with `Authorization` (Bearer or DPoP
+  # what the broker sends: GET with `Authorization` (Bearer or DPoP
   # scheme) and the `DPoP` proof header. There is no POST: the application is
   # registered read-only.
   # `WWW-Authenticate` is exposed so the page can read the challenge
@@ -638,11 +638,11 @@ class RelyingParty < Sinatra::Base
   end
 
   # Response body for the API. `delegated_access` is what a
-  # delegation-aware API reads: the acting service provider,
+  # delegation-aware API reads: the acting broker,
   # the delegation_id that identifies the grant, the application's
   # scope, whether the assertion was key-bound (so the call carried a DPoP
   # proof) and the bound key's thumbprint. `_assertion` is a demo affordance so
-  # the service provider's demo page can show what the API saw; a production
+  # the broker's demo page can show what the API saw; a production
   # API would not echo it.
   def benefits_payload(assertion, record)
     {
@@ -653,7 +653,7 @@ class RelyingParty < Sinatra::Base
         delegation_scopes: assertion.delegation_scopes,
         key_bound: assertion.bound?,
         # The thumbprint the assertion is bound to (nil when unbound), so the
-        # service provider's demo page can confirm which key was checked.
+        # broker's demo page can confirm which key was checked.
         dpop_jkt: assertion.dpop_jkt,
       },
       _assertion: {

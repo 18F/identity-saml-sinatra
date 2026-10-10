@@ -16,7 +16,7 @@
       <code><%= h settings.rs_config.resource_identifier %></code>. No call to Login.gov per request.
     </p>
     <% if decisions.empty? %>
-      <p>No decisions yet. Have the service provider exchange for a SAML assertion and call this API.</p>
+      <p>No decisions yet. Have the broker exchange for a SAML assertion and call this API.</p>
     <% else %>
       <table class="usa-table usa-table--striped usa-table--compact">
         <thead>
@@ -25,7 +25,7 @@
             <th scope="col">Route</th>
             <th scope="col">Decision</th>
             <th scope="col">Required scope</th>
-            <th scope="col">Actor (service provider)</th>
+            <th scope="col">Actor (broker)</th>
             <th scope="col">delegation_id</th>
             <th scope="col">Approved scopes</th>
             <th scope="col">NameID / uuid</th>

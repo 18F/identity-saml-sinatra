@@ -8,7 +8,7 @@ require 'time'
 require 'xml_security'
 require_relative './dpop_verifier'
 
-# Validates a delegated SAML 2.0 assertion that a service provider presents to
+# Validates a delegated SAML 2.0 assertion that a client broker presents to
 # this API as a bearer token, and exposes what the API needs from it.
 #
 # The token is what Login.gov's token exchange returned for an API registered
@@ -75,12 +75,12 @@ class DelegatedAssertion
   # The token exchange appends delegation attributes to the agency's normal
   # bundle. `delegation_scopes` (what the user approved) and `delegation_id`
   # (the join key to Attempts events) are what make an assertion a delegated
-  # one and are required. `actor` names the service provider acting for the
+  # one and are required. `actor` names the broker acting for the
   # user (the SAML counterpart of the OAuth `act` claim, RFC 8693 §4.1); it is
   # observed and logged, never a reason to reject on its own, so an API that
   # also accepts assertions without it keeps working. `dpop_jkt`, when present,
   # is the RFC 7638 thumbprint of the key the assertion is bound to (RFC 9449):
-  # the service provider must then prove possession of that key on every
+  # the broker must then prove possession of that key on every
   # request, and a copy of the assertion alone is useless.
   REQUIRED_DELEGATION_ATTRIBUTES = %w[delegation_scopes delegation_id].freeze
   DELEGATION_ATTRIBUTES = (REQUIRED_DELEGATION_ATTRIBUTES + %w[actor dpop_jkt]).freeze
@@ -143,7 +143,7 @@ class DelegatedAssertion
     read_attributes
     # Key binding comes after the signature (so `dpop_jkt` is trusted) and
     # before replay (so a bad proof does not consume this assertion's one
-    # presentation; the service provider can retry with a correct proof).
+    # presentation; the broker can retry with a correct proof).
     check_key_binding
     check_replay
     self
@@ -160,7 +160,7 @@ class DelegatedAssertion
     attributes['delegation_id']
   end
 
-  # The service provider acting for the user: SAML counterpart of the OAuth
+  # The broker acting for the user: SAML counterpart of the OAuth
   # `act` claim (RFC 8693 §4.1).
   def actor
     attributes['actor']

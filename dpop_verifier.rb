@@ -10,7 +10,7 @@ require 'uri'
 # assertion.
 #
 # A key-bound assertion carries a `dpop_jkt` attribute: the RFC 7638 JWK
-# thumbprint of the key the service provider proved possession of when
+# thumbprint of the key the broker proved possession of when
 # Login.gov issued the assertion. Every request that presents such an
 # assertion must also carry a `DPoP` header holding a proof JWT signed with
 # that key, so a copy of the assertion is useless to anyone who does not hold
@@ -83,7 +83,7 @@ class DpopVerifier
     thumbprint = check_thumbprint(jwk, expected_jkt)
     # Step 10, last on purpose: remembering the jti is a side effect, so it
     # happens only once every other check has passed. A proof rejected above
-    # never consumes a jti the service provider might legitimately resend.
+    # never consumes a jti the broker might legitimately resend.
     check_jti(payload)
     thumbprint
   end
@@ -188,7 +188,7 @@ class DpopVerifier
   end
 
   # RFC 9449 §4.3 (10): iat is present and within the acceptable window on
-  # either side of now. The window is symmetric because the service provider's
+  # either side of now. The window is symmetric because the broker's
   # clock may be ahead as well as behind.
   def check_iat(payload)
     iat = payload['iat']

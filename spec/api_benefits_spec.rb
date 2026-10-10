@@ -26,7 +26,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
     header 'DPoP', proof if proof
   end
 
-  # A signed assertion bound to the test service provider's key.
+  # A signed assertion bound to the test broker's key.
   def bound_token(key: D.ec_key, **overrides)
     F.token(attributes: F::DEFAULT_ATTRIBUTES.merge('dpop_jkt' => D.jkt(key)), **overrides)
   end
@@ -411,7 +411,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       expect(body_json['error_description']).to match(/more than one/)
     end
 
-    it 'compares htu against the URL the service provider called, including forwarded scheme and host' do
+    it 'compares htu against the URL the broker called, including forwarded scheme and host' do
       header 'X-Forwarded-Proto', 'https'
       header 'X-Forwarded-Host', 'benefits-api.agency.localdev'
       dpop token, D.proof(token:, url: 'https://benefits-api.agency.localdev/api/benefits')

@@ -15,7 +15,7 @@ class DecisionLog
     :required_scope,     # the token_exchange:* value the route needs
     :name_id,            # Subject/NameID (pairwise identifier for this agency)
     :uuid,               # `uuid` attribute (same identifier the agency sees at direct sign-in)
-    :actor,              # `actor` attribute: the service provider acting for the user
+    :actor,              # `actor` attribute: the broker acting for the user
     :delegation_id,      # `delegation_id` attribute: joins to Attempts events
     :delegation_scopes,  # Array of approved token_exchange:* values
     :assertion_id,       # Assertion/@ID (what revocation and introspection key on)

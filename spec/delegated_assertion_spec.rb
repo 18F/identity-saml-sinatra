@@ -53,7 +53,7 @@ RSpec.describe DelegatedAssertion do
     expect(assertion.expires_at).to be_within(1).of(now + 300 + 60)
   end
 
-  it 'accepts an identifiers-only assertion (refresh after the service provider session ended)' do
+  it 'accepts an identifiers-only assertion (refresh after the broker session ended)' do
     attrs = factory::DEFAULT_ATTRIBUTES.slice('uuid', 'ial', 'aal', 'delegation_scopes', 'delegation_id', 'actor')
     assertion = validate(factory.sign(factory.assertion_xml(attributes: attrs)))
 

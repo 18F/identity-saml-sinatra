@@ -11,7 +11,7 @@ require 'securerandom'
 module DpopFactory
   module_function
 
-  # The service provider's key: ES256 (EC P-256) by default.
+  # The broker's key: ES256 (EC P-256) by default.
   def ec_key
     @ec_key ||= OpenSSL::PKey::EC.generate('prime256v1')
   end
