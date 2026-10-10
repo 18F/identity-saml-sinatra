@@ -59,7 +59,7 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       expect(body_json['delegated_access']).to eq(
         'actor' => F::ACTOR,
         'delegation_id' => 'del-0001',
-        'delegation_scopes' => %w[token_exchange:benefits_read token_exchange:benefits_write],
+        'delegation_scopes' => %w[token_exchange:retirement_benefits],
         'key_bound' => false,
         'dpop_jkt' => nil,
       )
@@ -247,13 +247,22 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       end
     end
 
-    it 'returns 403 insufficient_scope when benefits_read was not approved' do
-      bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.merge('delegation_scopes' => 'token_exchange:benefits_write'))
+    it 'returns 403 insufficient_scope for an assertion carrying another application\'s scope' do
+      bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.merge('delegation_scopes' => 'token_exchange:housing_records'))
       get '/api/benefits'
 
       expect(last_response.status).to eq(403)
       expect(last_response.headers['WWW-Authenticate']).to include('error="insufficient_scope"')
-      expect(last_response.headers['WWW-Authenticate']).to include('scope="token_exchange:benefits_read"')
+      expect(last_response.headers['WWW-Authenticate']).to include('scope="token_exchange:retirement_benefits"')
+    end
+
+    it 'does not match on a prefix or substring of the scope value' do
+      bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.merge(
+        'delegation_scopes' => 'token_exchange:retirement_benefits_archive retirement_benefits',
+      ))
+      get '/api/benefits'
+
+      expect(last_response.status).to eq(403)
     end
 
     it 'fails closed with 503 when IdP metadata cannot be fetched' do
@@ -307,15 +316,6 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
       get '/api/benefits'
 
       expect(last_response.status).to eq(200), last_response.body
-    end
-
-    it 'binds the proof to the request: POST needs its own proof with htm POST' do
-      token = bound_token(name_id: 'bound-writer')
-      dpop token, D.proof(token:, method: 'POST')
-      post '/api/benefits', { preferred_contact: 'email' }.to_json, 'CONTENT_TYPE' => 'application/json'
-
-      expect(last_response.status).to eq(200), last_response.body
-      expect(body_json['benefits']['preferred_contact']).to eq('email')
     end
 
     it 'refuses a bound assertion presented as a plain Bearer token' do
@@ -443,29 +443,12 @@ RSpec.describe 'delegated-access API (/api/benefits)' do
   end
 
   describe 'POST /api/benefits' do
-    it 'requires benefits_write in delegation_scopes' do
-      bearer F.token(attributes: F::DEFAULT_ATTRIBUTES.merge('delegation_scopes' => 'token_exchange:benefits_read'))
-      post '/api/benefits', { preferred_contact: 'email' }.to_json, 'CONTENT_TYPE' => 'application/json'
-
-      expect(last_response.status).to eq(403)
-      expect(body_json['error']).to eq('insufficient_scope')
-    end
-
-    it 'applies the change and records the acting service provider' do
-      bearer F.token(name_id: 'writer-1')
-      post '/api/benefits', { preferred_contact: 'email' }.to_json, 'CONTENT_TYPE' => 'application/json'
-
-      expect(last_response.status).to eq(200), last_response.body
-      expect(body_json['benefits']['preferred_contact']).to eq('email')
-      expect(body_json['benefits']['last_updated']).to include('by_actor' => F::ACTOR, 'delegation_id' => 'del-0001')
-    end
-
-    it 'rejects fields that are not editable' do
+    it 'does not exist: the application is registered read-only, whatever the assertion carries' do
       bearer F.token
-      post '/api/benefits', { status: 'closed' }.to_json, 'CONTENT_TYPE' => 'application/json'
+      post '/api/benefits', { preferred_contact: 'email' }.to_json, 'CONTENT_TYPE' => 'application/json'
 
-      expect(last_response.status).to eq(400)
-      expect(body_json['error']).to eq('invalid_request')
+      expect(last_response.status).to eq(404)
+      expect(RelyingParty.settings.decision_log.entries).to be_empty
     end
   end
 end

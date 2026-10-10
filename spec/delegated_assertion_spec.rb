@@ -45,7 +45,7 @@ RSpec.describe DelegatedAssertion do
     expect(assertion.name_id_format).to eq('urn:oasis:names:tc:SAML:2.0:nameid-format:persistent')
     expect(assertion.subject_not_on_or_after).to be_within(1).of(now + 300)
     expect(assertion.not_on_or_after).to be_within(1).of(now + 3600)
-    expect(assertion.delegation_scopes).to eq(%w[token_exchange:benefits_read token_exchange:benefits_write])
+    expect(assertion.delegation_scopes).to eq(%w[token_exchange:retirement_benefits])
     expect(assertion.delegation_id).to eq('del-0001')
     expect(assertion.actor).to eq(factory::ACTOR)
     expect(assertion.attributes).to include('first_name' => 'Test', 'last_name' => 'User')

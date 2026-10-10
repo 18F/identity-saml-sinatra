@@ -6,9 +6,10 @@
 #    obtains a SAML 2.0 assertion for this API from Login.gov's token exchange
 #    (RFC 8693) and presents it as a bearer token (RFC 6750), or, when the
 #    assertion is bound to the service provider's key, with the DPoP scheme and
-#    a proof of possession (RFC 9449). GET/POST /api/benefits validate it
-#    locally (DelegatedAssertion, DpopVerifier) and enforce the scopes the
-#    user approved; /decisions shows every decision.
+#    a proof of possession (RFC 9449). GET /api/benefits validates it locally
+#    (DelegatedAssertion, DpopVerifier) and requires this application's one
+#    delegation scope; the application is registered read-only, so there is
+#    no write route. /decisions shows every decision.
 # 3. Third-Party-Initiated Login, the relying-party side of OpenID Connect Core
 #    1.0 §4 (https://openid.net/specs/openid-connect-core-1_0.html#ThirdPartyInitiatedLogin)
 #    applied to this SAML service provider: a third party (the service provider)
@@ -65,12 +66,6 @@ class RelyingParty < Sinatra::Base
   def self.reset_idp_metadata!
     @idp_metadata = nil
   end
-
-  # Scopes as they appear on the wire: the full `token_exchange:` form. The
-  # exchange response `scope`, introspection and the SAML `delegation_scopes`
-  # attribute all carry it, and resource servers compare whole strings.
-  BENEFITS_READ = 'token_exchange:benefits_read'
-  BENEFITS_WRITE = 'token_exchange:benefits_write'
 
   # Raised by #presented_token when the request carries no Bearer or DPoP credentials.
   class MissingToken < StandardError; end
@@ -376,27 +371,14 @@ class RelyingParty < Sinatra::Base
     halt 204
   end
 
-  # Reads require the read capability the user approved for this API.
+  # The application's one delegation scope, as it appears on the wire in the
+  # exchange response `scope` and the assertion's `delegation_scopes`
+  # attribute. The application is registered read-only, so a read is all this
+  # API offers; there is no write route.
   get '/api/benefits' do
-    assertion = authorize!(BENEFITS_READ)
+    assertion = authorize!(settings.rs_config.delegation_scope)
     record = settings.benefits.record_for(assertion.name_id)
     json_response(benefits_payload(assertion, record))
-  end
-
-  # Writes require the read_write capability. The scope check *is* the policy:
-  # a delegation with only benefits_read gets 403 insufficient_scope here.
-  post '/api/benefits' do
-    assertion = authorize!(BENEFITS_WRITE)
-    changes = parse_json_body
-    record = settings.benefits.update(
-      assertion.name_id,
-      changes,
-      actor: assertion.actor,
-      delegation_id: assertion.delegation_id,
-    )
-    json_response(benefits_payload(assertion, record))
-  rescue DemoBenefits::InvalidChange => e
-    halt_json(400, 'invalid_request', e.message)
   end
 
   # Every decision the API made, newest first.
@@ -432,7 +414,7 @@ class RelyingParty < Sinatra::Base
   #                               InResponseTo; no call to Login.gov; then, for
   #                               a key-bound assertion, the DPoP proof
   #                               (RFC 9449 §4.3)
-  #   enforce_scope               delegation_scopes per endpoint
+  #   enforce_scope               delegation_scopes carries this application's scope
   #   log_decision                record what was decided
   #
   # @return [DelegatedAssertion] the validated assertion
@@ -562,10 +544,11 @@ class RelyingParty < Sinatra::Base
     )
   end
 
-  # The `delegation_scopes` attribute lists exactly the capabilities the user
-  # approved for this resource, as space-delimited scope strings (RFC 6749
-  # §3.3) in their full `token_exchange:<value>` form. Compare full strings;
-  # never match on a prefix or substring.
+  # The `delegation_scopes` attribute carries the one delegation scope of the
+  # application the assertion was issued for, in its full `token_exchange:<value>`
+  # form (space-delimited per RFC 6749 §3.3 should there ever be more than
+  # one). An assertion for another application is refused. Compare full
+  # strings; never match on a prefix or substring.
   def enforce_scope(assertion, required_scope)
     return if assertion.delegation_scopes.include?(required_scope)
 
@@ -626,8 +609,9 @@ class RelyingParty < Sinatra::Base
   # `Access-Control-Allow-Origin` echoes the one matching origin (never `*`:
   # the responses carry per-user data), `Vary: Origin` keeps caches from
   # serving one origin's answer to another, and the allow lists name exactly
-  # what the service provider sends: GET and POST with `Authorization`
-  # (Bearer or DPoP scheme), the `DPoP` proof header and a JSON body.
+  # what the service provider sends: GET with `Authorization` (Bearer or DPoP
+  # scheme) and the `DPoP` proof header. There is no POST: the application is
+  # registered read-only.
   # `WWW-Authenticate` is exposed so the page can read the challenge
   # (RFC 6750 §3, RFC 9449 §7.1) on a 401 or 403. A request from any other
   # origin gets no CORS headers and the browser withholds the response.
@@ -637,7 +621,7 @@ class RelyingParty < Sinatra::Base
 
     headers 'Access-Control-Allow-Origin' => request.env['HTTP_ORIGIN'],
             'Vary' => 'Origin',
-            'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
             'Access-Control-Allow-Headers' => 'Authorization, DPoP, Content-Type',
             'Access-Control-Expose-Headers' => 'WWW-Authenticate',
             'Access-Control-Max-Age' => '600'
@@ -653,19 +637,10 @@ class RelyingParty < Sinatra::Base
     payload.to_json
   end
 
-  def parse_json_body
-    body = request.body.read
-    raise DemoBenefits::InvalidChange.new('request body must be JSON') if body.to_s.strip.empty?
-
-    JSON.parse(body)
-  rescue JSON::ParserError
-    raise DemoBenefits::InvalidChange.new('request body must be JSON')
-  end
-
-  # Response body for both routes. `delegated_access` is what a
+  # Response body for the API. `delegated_access` is what a
   # delegation-aware API reads: the acting service provider,
-  # the delegation_id that identifies the grant, the approved
-  # scopes, whether the assertion was key-bound (so the call carried a DPoP
+  # the delegation_id that identifies the grant, the application's
+  # scope, whether the assertion was key-bound (so the call carried a DPoP
   # proof) and the bound key's thumbprint. `_assertion` is a demo affordance so
   # the service provider's demo page can show what the API saw; a production
   # API would not echo it.

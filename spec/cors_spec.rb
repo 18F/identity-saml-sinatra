@@ -34,7 +34,7 @@ RSpec.describe 'CORS on /api/benefits' do
   end
 
   describe 'preflight (OPTIONS)' do
-    it 'allows GET and POST with Authorization, DPoP and Content-Type from the configured origin' do
+    it 'allows GET (no POST: the application is read-only) with Authorization, DPoP and Content-Type' do
       header 'Origin', sp_origin
       header 'Access-Control-Request-Method', 'GET'
       header 'Access-Control-Request-Headers', 'authorization, dpop'
@@ -42,7 +42,7 @@ RSpec.describe 'CORS on /api/benefits' do
 
       expect(last_response.status).to eq 204
       expect(last_response.headers['Access-Control-Allow-Origin']).to eq sp_origin
-      expect(last_response.headers['Access-Control-Allow-Methods']).to eq 'GET, POST, OPTIONS'
+      expect(last_response.headers['Access-Control-Allow-Methods']).to eq 'GET, OPTIONS'
       expect(last_response.headers['Access-Control-Allow-Headers']).to eq 'Authorization, DPoP, Content-Type'
       expect(last_response.headers['Vary']).to include 'Origin'
     end
@@ -79,16 +79,6 @@ RSpec.describe 'CORS on /api/benefits' do
       header 'Origin', sp_origin
       header 'Authorization', "Bearer #{DelegatedAssertionFactory.token(name_id: 'user-1')}"
       get '/api/benefits'
-
-      expect(last_response.status).to eq(200), last_response.body
-      expect(last_response.headers['Access-Control-Allow-Origin']).to eq sp_origin
-    end
-
-    it 'accepts a cross-origin POST with a JSON body from the allowed origin' do
-      header 'Origin', sp_origin
-      header 'Authorization', "Bearer #{DelegatedAssertionFactory.token(name_id: 'user-1')}"
-      header 'Content-Type', 'application/json'
-      post '/api/benefits', { mailing_address: '1 Demo Street, Washington, DC 20001' }.to_json
 
       expect(last_response.status).to eq(200), last_response.body
       expect(last_response.headers['Access-Control-Allow-Origin']).to eq sp_origin

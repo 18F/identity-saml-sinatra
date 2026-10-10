@@ -90,7 +90,7 @@ module DelegatedAssertionFactory
     'email' => 'test.user@example.com',
     'first_name' => 'Test',
     'last_name' => 'User',
-    'delegation_scopes' => 'token_exchange:benefits_read token_exchange:benefits_write',
+    'delegation_scopes' => 'token_exchange:retirement_benefits',
     'delegation_id' => 'del-0001',
     'actor' => ACTOR,
   }.freeze

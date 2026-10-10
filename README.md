@@ -7,10 +7,12 @@ provider, in two roles:
 1. **Direct SAML sign-in.** The agency's own web app: users sign in to Login.gov and a
    SAML response is posted to `/consume`. This is the original sample and is unchanged.
 2. **SAML resource server for delegated access** (reference implementation). An API,
-   `GET`/`POST /api/benefits`, that accepts **delegated SAML 2.0 assertions** issued by
-   Login.gov's token exchange (RFC 8693) on behalf of a user to a third-party *service
-   provider*, validates them locally with `ruby-saml`, and enforces the capabilities the user
-   approved. The API answers cross-origin requests from the service provider's browser pages (CORS).
+   `GET /api/benefits`, that accepts **delegated SAML 2.0 assertions** issued by Login.gov's
+   token exchange (RFC 8693) on behalf of a user to a third-party *service provider*, validates
+   them locally with `ruby-saml`, and requires this application's one delegation scope
+   (`token_exchange:retirement_benefits`). The application is registered read-only, so the API
+   has no write route. It answers cross-origin requests from the service provider's browser
+   pages (CORS).
 
 Everything here is a demo. Benefits data is fictional and generated from a hash of the
 user's identifier; nothing is persisted beyond the process.
@@ -47,8 +49,7 @@ Pass `HOST=` or `PORT=` to `make run` to change the bind address.
 |---|---|---|
 | `GET /`, `/login_get`, `/login_post`, `POST /consume`, `/logout`, `/slo_logout` | direct sign-in | The original SAML service-provider sample |
 | `GET /initiate_login` | direct sign-in | Third-Party-Initiated Login (OpenID Connect Core 1.0 §4): a third party (the service provider) starts this agency's own SAML sign-in and gets the user back afterwards. See below. |
-| `GET /api/benefits` | resource server | Requires `token_exchange:benefits_read` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof |
-| `POST /api/benefits` | resource server | Requires `token_exchange:benefits_write`; JSON body with `mailing_address` and/or `preferred_contact`; same DPoP rule |
+| `GET /api/benefits` | resource server | Requires `token_exchange:retirement_benefits` in the assertion's `delegation_scopes`; a key-bound assertion also needs a DPoP proof. There is no `POST`: the application is registered read-only |
 | `GET /decisions`, `/decisions.json` | resource server | Every allow/deny decision the API made (in memory) |
 | `OPTIONS /api/*` | resource server | CORS preflight answer for the service provider's browser pages (see below) |
 
@@ -80,6 +81,7 @@ Resource server (new):
 | `DPOP_ALLOWED_ALGS` | `ES256 RS256` | JWS algorithms accepted in a DPoP proof; advertised in the `WWW-Authenticate` challenge |
 | `DPOP_IAT_LEEWAY_SECONDS` | `60` | Seconds a DPoP proof's `iat` may differ from this server's clock |
 | `DECISION_LOG_SIZE` | `200` | Entries kept for `/decisions` |
+| `DELEGATION_SCOPE` | `token_exchange:retirement_benefits` | The application's one delegation scope, as registered at Login.gov; the route requires it |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:9292` | Browser origins allowed to call `/api/*` cross-origin (exact `scheme://host[:port]`, space- or comma-separated). The service provider reference app is a browser public client and calls this API with `fetch` |
 
 To run against the sandbox (`idp.int.identitysandbox.gov`) change `idp_url`, the
@@ -87,20 +89,25 @@ direct-sign-in URLs, and the identifiers to the values from onboarding; no code 
 
 ## Registering with Login.gov
 
-The local IdP fixtures (`config/service_providers.localdev.yml` in `identity-idp`) register
-this app as:
+The local IdP fixtures (`config/delegated_access.localdev.yml` in `identity-idp`, loaded by
+`rake delegated_access:seed`) register this app as:
 
-- **Agency service provider** — issuer `urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency`,
-  agency_id 2, IAL2, ACS `http://localhost:4567/consume`, certificate `sp_sinatra_demo`
+- **Agency application** — issuer `urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency`,
+  friendly name "Retirement Benefits Portal", agency "National Retirement Administration"
+  (`agency_id: 102`), IAL2, ACS `http://localhost:4567/consume`, certificate `sp_sinatra_demo`
   (this repo's `config/demo_sp.crt`), `block_encryption: aes256-cbc`, attribute bundle
-  `email first_name last_name`, `token_exchange_target: true`.
+  `email first_name last_name`, `delegation_application: true`, one delegation scope
+  `delegation_scope_value: retirement_benefits` (`token_exchange:retirement_benefits` on the
+  wire), `delegation_access_type: read`, and the service providers it accepts
+  (`allowed_delegation_service_providers`).
 - **Resource server** — `identifier: https://benefits-api.agency.localdev`,
-  `token_format: saml2`, `certs: [sp_sinatra_demo]` (assertions are encrypted to it), with
-  scopes `benefits_read` (read) and `benefits_write` (read_write).
+  `token_format: saml2`, `certs: [sp_sinatra_demo]` (assertions are encrypted to it).
 
-An agency onboarding for real supplies the same things: its
-SAML issuer, the resource server identifier, `token_format: saml2`, a certificate for
-encryption, and one scope with plain-language content per capability.
+Nothing in that file turns key binding on or off: assertions are key-bound whenever the
+service provider is a public client. An agency onboarding for real supplies the same things:
+its SAML issuer, one delegation scope with plain-language content, its access type (`read` or
+`read_write`), the service providers it accepts, the resource server identifier,
+`token_format: saml2`, and a certificate for encryption.
 
 ## Third-Party-Initiated Login (OpenID Connect Core 1.0 §4)
 
@@ -149,8 +156,10 @@ Service provider ── GET /api/benefits  Authorization: Bearer <access_token> 
                  ◄── 200 { benefits, delegated_access: { actor, delegation_id, delegation_scopes, key_bound, dpop_jkt }, _assertion }
 ```
 
-When the service provider proved possession of a key at the exchange (RFC 9449 DPoP), Login.gov
-adds a `dpop_jkt` attribute to the assertion and the call looks like this instead:
+Whether the assertion is key-bound follows the service provider's client type: a public
+client's (the browser-based reference service provider's) always are, a confidential client's
+never; no application sets or waives it. For a bound assertion Login.gov adds a `dpop_jkt`
+attribute and the call looks like this instead:
 
 ```
 Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
@@ -164,7 +173,7 @@ Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
 | Read the token and its scheme (`Bearer` or `DPoP`) | `presented_token` | RFC 6750 §2.1, RFC 9449 §7.1 |
 | Base64url-decode it | `DelegatedAssertion.decode` | RFC 8693 §3, RFC 4648 §5 |
 | Validate the assertion locally, then the DPoP proof if it is key-bound | `validate_assertion` → `DelegatedAssertion#validate!` | see below |
-| Enforce the route's scope | `enforce_scope` | `delegation_scopes` attribute, compared as full strings |
+| Require the application's one scope | `enforce_scope` | `delegation_scopes` attribute, compared as full strings |
 | Record the decision | `log_decision` | shown at `/decisions` |
 
 `DelegatedAssertion#validate!` (`delegated_assertion.rb`) runs, in order:
@@ -191,8 +200,9 @@ Service provider ── GET /api/benefits  Authorization: DPoP <access_token>
 6. `check_conditions` — `NotBefore`/`NotOnOrAfter` with drift; every `AudienceRestriction`
    must contain `RESOURCE_IDENTIFIER` (SAML Core §2.5.1.4); no `AudienceRestriction` or any
    other Condition type makes the assertion invalid (SAML Core §2.5.1).
-7. `read_attributes` — the `AttributeStatement`, keyed by `Name`. `delegation_scopes`
-   (space-separated `token_exchange:*` values) and `delegation_id` are required; without them
+7. `read_attributes` — the `AttributeStatement`, keyed by `Name`. `delegation_scopes` (the one
+   `token_exchange:*` value of the application the assertion is for) and `delegation_id` are
+   required; without them
    it is not a delegated assertion. `actor` is the service provider's issuer, the SAML
    counterpart of the OAuth `act` claim (RFC 8693 §4.1); it is observed and logged when present
    but its absence alone is never a reason to reject, so an API that also accepts assertions
@@ -215,11 +225,13 @@ are accepted and which proof algorithms work.
 
 ### Key-bound assertions (RFC 9449 DPoP)
 
-A delegated assertion is a bearer token: whoever holds it can use it for its five-minute
-window. A service provider that runs in a browser, or that wants a stolen assertion to be
-worthless, proves possession of a key pair when it exchanges with Login.gov. Login.gov then
-binds the family to that key and puts the key's RFC 7638 thumbprint in a `dpop_jkt`
-attribute. This app enforces the binding (`dpop_verifier.rb`, one method per check):
+An unbound delegated assertion is a bearer token: whoever holds it can use it for its
+five-minute window. A public client, such as the browser-based reference service provider,
+proves possession of a key pair on every exchange with Login.gov, and Login.gov binds the
+family to that key and puts the key's RFC 7638 thumbprint in a `dpop_jkt` attribute. That
+binding is decided by the service provider's client type alone; this API has no setting for
+it and enforces the binding whenever `dpop_jkt` is present (`dpop_verifier.rb`, one method per
+check):
 
 | Check | Rule | Standard |
 |---|---|---|
@@ -249,10 +261,14 @@ compares `htu` against is the one the service provider called.
 
 The API reads `actor` and treats every call carrying it as delegated access by that service
 provider: the response's `delegated_access` block names the actor, the `delegation_id` and the
-approved scopes, and a POST records who made the change. The policy itself is the scope check:
-a delegation approved only for `benefits_read` gets `403 insufficient_scope` on POST. Which
-service providers may act for this agency's users is agreed during onboarding, not enforced
-by parsing the assertion.
+application's scope. Login.gov registers each agency application with exactly one delegation
+scope and an access type; an assertion for this API carries
+`delegation_scopes: token_exchange:retirement_benefits` and nothing else, and one carrying
+another application's scope gets `403 insufficient_scope`. Whether a write is offered is the
+application's registration, not a second scope: this application is read-only, so the API has
+no `POST` route at all. Which service providers may act for this agency's users is agreed
+during onboarding (`allowed_delegation_service_providers`), not enforced by parsing the
+assertion.
 
 ### Revocation window (accepted)
 
@@ -282,7 +298,7 @@ would not return it.
 ## CORS for the service provider's browser
 
 The reference service provider is a browser-based public client: the page the user is looking at
-holds the delegated assertion and calls `GET`/`POST /api/benefits` with `fetch`. Because that page
+holds the delegated assertion and calls `GET /api/benefits` with `fetch`. Because that page
 is served from another origin, the browser first sends a preflight `OPTIONS /api/benefits` naming
 the method and the request headers, and only sends the real request if the answer allows them
 (Fetch standard, https://fetch.spec.whatwg.org/#http-cors-protocol). For requests whose `Origin`
@@ -291,7 +307,7 @@ is in `CORS_ALLOWED_ORIGINS` the API answers with:
 ```
 Access-Control-Allow-Origin: <the matching origin>
 Vary: Origin
-Access-Control-Allow-Methods: GET, POST, OPTIONS
+Access-Control-Allow-Methods: GET, OPTIONS
 Access-Control-Allow-Headers: Authorization, DPoP, Content-Type
 Access-Control-Expose-Headers: WWW-Authenticate
 Access-Control-Max-Age: 600

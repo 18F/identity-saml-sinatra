@@ -148,8 +148,9 @@ class DelegatedAssertion
     self
   end
 
-  # Space-separated approved capability values for this resource, e.g.
-  # ["token_exchange:benefits_read"]. Compared as full strings.
+  # The delegation scope of the application the assertion was issued for, e.g.
+  # ["token_exchange:retirement_benefits"]: one value per application, split on
+  # spaces per RFC 6749 §3.3. Compared as full strings.
   def delegation_scopes
     Array(attributes['delegation_scopes']).join(' ').split
   end

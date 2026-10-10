@@ -46,8 +46,8 @@ RSpec.describe 'decision log (/decisions)' do
       'decision' => 'allow',
       'actor' => factory::ACTOR,
       'delegation_id' => 'del-A',
-      'required_scope' => 'token_exchange:benefits_read',
-      'delegation_scopes' => %w[token_exchange:benefits_read token_exchange:benefits_write],
+      'required_scope' => 'token_exchange:retirement_benefits',
+      'delegation_scopes' => %w[token_exchange:retirement_benefits],
       'uuid' => 'agency-uuid-1234',
     )
   end

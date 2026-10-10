@@ -12,6 +12,7 @@ require 'uri'
 class ResourceServerConfig
   DEFAULT_ISSUER = 'urn:gov:gsa:SAML:2.0.profiles:sp:sso:benefits_agency'
   DEFAULT_RESOURCE_IDENTIFIER = 'https://benefits-api.agency.localdev'
+  DEFAULT_DELEGATION_SCOPE = 'token_exchange:retirement_benefits'
   DEFAULT_IDP_URL = 'http://localhost:3000'
   DEFAULT_SAML_METADATA_YEAR = '2026'
   DEFAULT_PRIVATE_KEY_PATH = './config/demo_sp.key'
@@ -27,6 +28,14 @@ class ResourceServerConfig
   # value this app requires in the assertion's Audience and Recipient.
   def resource_identifier
     ENV.fetch('RESOURCE_IDENTIFIER', DEFAULT_RESOURCE_IDENTIFIER)
+  end
+
+  # The one delegation scope this application is registered with at Login.gov,
+  # in its full wire form. Every delegated assertion for this API carries
+  # exactly this value in `delegation_scopes`, and every route requires it.
+  # The application is registered read-only, so the API has no write route.
+  def delegation_scope
+    ENV.fetch('DELEGATION_SCOPE', DEFAULT_DELEGATION_SCOPE)
   end
 
   def idp_url
